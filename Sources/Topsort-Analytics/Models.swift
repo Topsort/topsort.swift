@@ -1,9 +1,6 @@
-//
-//  File.swift
-//  
-//
-//  Created by Pablo Reszczynski on 09-05-23.
-//
+/**
+ Topsort Events API models based on our public API: https://docs.topsort.com/reference/reportevents-1
+ */
 
 import Foundation
 
@@ -13,12 +10,45 @@ enum EntityType : String, Codable {
 }
 
 struct Placement: Codable {
+    /**
+     URL path of the page triggering the event.
+     
+     For mobile apps, use the deep link for the current view, if available.
+     Otherwise, encode the view from which the event occurred in your app as a path-like string (e.g. /root/categories/:categoryId).
+     */
     let path: String
+    
+    /**
+     For components with multiple items (i.e. search results, similar products, etc), this should indicate the index of a given item within that list.
+     */
     let position: Int?
+    
+    /**
+     For paginated pages, this should indicate which page number triggered the event.
+     */
     let page: Int?
+    
+    /**
+     For paginated pages this should indicate how many items are in each result page.
+     */
     let pageSize: Int?
+    
+    /**
+     The ID of the product associated to the page in which this event occurred, if applicable. This ID must match the ID
+     provided through the catalog service.
+     */
     let productId: String?
+    
+    /**
+     An array of IDs of the categories associated to the page in which this event occurred, if applicable. These IDs must
+     match the IDs provided through the catalog service.
+     */
     let categoryIds: [String]?
+    
+    /**
+     The search string provided by the user in the page where this event occurred, if applicable. This search string must
+     match the searchQuery field that was provided in the auction request (if provided).
+     */
     let searchQuery: String?
     
     init(path: String, position: Int? = nil, page: Int? = nil, pageSize: Int? = nil, productId: String? = nil, categoryIds: [String]? = nil, searchQuery: String? = nil) {
@@ -38,15 +68,50 @@ struct Entity : Codable {
 }
 
 struct Event : Codable {
-    let entity: Entity
+    /**
+     The entity associated with the promotable over which the interaction occurred.
+     It will be ignored if resolvedBidId is not blank.
+     */
+    let entity: Entity?
+    
+    /**
+     RFC3339 formatted timestamp including UTC offset.
+     */
     let ocurredAt: Date
+    
+    /**
+     The opaque user ID allows correlating user activity, such as Impressions, Clicks and Purchases, whether or not they
+     are actually logged in. It must be long lived (at least a year) so that Topsort can attribute purchases.
+     
+     If your users are always logged in you may use a hash of your customer ID. If your users may interact with your app or site while logged out we recommend generating a random identifier (UUIDv4) on first load and store it on local storage (cookie, local storage, etc) and let it live for at least a year.
+     */
     let opaqueUserId: String
+    
+    /**
+     The marketplace's unique ID for the impression. This field ensures the event reporting is idempotent in case there is
+     a network issue and the request is retried. If there is no impression model on the marketplace side, generate a unique
+     string that does not change if the event is resent.
+     */
     let id: UUID
+    
+    /**
+     If the impression is over an ad promotion, this is the `resolvedBidId` field received from the /auctions request.
+     */
     let resolvedBidId: String?
+    
     let placement: Placement?
 
-    init(entity: Entity, ocurredAt: Date, opaqueUserId: String, resolvedBidId: String? = nil, placement: Placement? = nil) {
+    init(entity: Entity, ocurredAt: Date, opaqueUserId: String, placement: Placement? = nil) {
         self.entity = entity
+        self.ocurredAt = ocurredAt
+        self.opaqueUserId = opaqueUserId
+        self.resolvedBidId = nil
+        self.placement = placement
+        self.id = UUID()
+    }
+    
+    init(resolvedBidId: String, ocurredAt: Date, opaqueUserId: String, placement: Placement? = nil) {
+        self.entity = nil
         self.ocurredAt = ocurredAt
         self.opaqueUserId = opaqueUserId
         self.resolvedBidId = resolvedBidId
@@ -56,8 +121,13 @@ struct Event : Codable {
 }
 
 struct PurchaseItem : Codable {
+    ///The marketplace ID of the product being purchased.
     let productId: String
+
+    /// Count of products purchased.
     let quantity: Int?
+    
+    /// The price of a single item in the marketplace currency.
     let unitPrice: Double
     
     init(productId: String, unitPrice: Double, quantity: Int? = nil) {
@@ -68,9 +138,28 @@ struct PurchaseItem : Codable {
 }
 
 struct PurchaseEvent : Codable {
+    /**
+     RFC3339 formatted timestamp, including UTC offset, of the instant in which the order was placed.
+     */
     let ocurrentAt: Date
+    
+    /**
+     The opaque user ID allows correlating user activity, such as Impressions, Clicks and Purchases, whether or not they
+     are actually logged in. It must be long lived (at least a year) so that Topsort can attribute purchases.
+
+     If your users are always logged in you may use a hash of your customer ID. If your users may interact with your app or
+     site while logged out we recommend generating a random identifier (UUIDv4) on first load and store it on local storage
+     (cookie, local storage, etc) and let it live for at least a year.
+     */
     let opaqueUserId: String
+    
     let items: [PurchaseItem]
+    
+    /**
+     The marketplace unique ID for the order. This field ensures the event reporting is idempotent in case there is a
+     network issue and the request is retried. If there is no unique ID for orders on the marketplace side, generate a
+     unique string that does not change if the event needs to be resent.
+     */
     let id: UUID
 }
 
