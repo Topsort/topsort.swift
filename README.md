@@ -8,6 +8,9 @@
 - Support for both SwiftUI and UIKit.
 - Support for Objective-C even.
 - User can send events manually, but also automatically track events.
+- Distribution via Swift packages, cocoa pods, and carthage.
+- CI / CD via Github Actions.
+  - Maybe even use fastlane.
 
 ## Tasks
 
