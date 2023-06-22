@@ -1,5 +1,5 @@
 import XCTest
-@testable import Analytics
+@testable import Topsort_Analytics
 
 final class analytics_swiftTests: XCTestCase {
     func testExample() throws {
@@ -11,7 +11,12 @@ final class analytics_swiftTests: XCTestCase {
     }
     
     func testEncodeModels() throws {
-        let myEvent = Event(entity: Entity(type: EntityType.product, id: "product-id"), ocurredAt: Date.now, opaqueUserId: "user-id")
+        let date = Date()
+        let iso8601DateFormatter = ISO8601DateFormatter()
+        iso8601DateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let occurredAt = iso8601DateFormatter.string(from: date)
+
+        let myEvent = Event(entity: Entity(type: EntityType.product, id: "product-id"), occurredAt: occurredAt, opaqueUserId: "user-id")
         let jsonEncoder = JSONEncoder()
         let jsonDecoder = JSONDecoder()
         jsonEncoder.dateEncodingStrategy = .iso8601

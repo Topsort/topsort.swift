@@ -77,7 +77,7 @@ struct Event : Codable {
     /**
      RFC3339 formatted timestamp including UTC offset.
      */
-    let ocurredAt: Date
+    let occurredAt: String
     
     /**
      The opaque user ID allows correlating user activity, such as Impressions, Clicks and Purchases, whether or not they
@@ -101,18 +101,18 @@ struct Event : Codable {
     
     let placement: Placement?
 
-    init(entity: Entity, ocurredAt: Date, opaqueUserId: String, placement: Placement? = nil) {
+    init(entity: Entity, occurredAt: String, opaqueUserId: String, placement: Placement? = nil) {
         self.entity = entity
-        self.ocurredAt = ocurredAt
+        self.occurredAt = occurredAt
         self.opaqueUserId = opaqueUserId
         self.resolvedBidId = nil
         self.placement = placement
         self.id = UUID()
     }
     
-    init(resolvedBidId: String, ocurredAt: Date, opaqueUserId: String, placement: Placement? = nil) {
+    init(resolvedBidId: String, occurredAt: String, opaqueUserId: String, placement: Placement? = nil) {
         self.entity = nil
-        self.ocurredAt = ocurredAt
+        self.occurredAt = occurredAt
         self.opaqueUserId = opaqueUserId
         self.resolvedBidId = resolvedBidId
         self.placement = placement
@@ -141,7 +141,7 @@ struct PurchaseEvent : Codable {
     /**
      RFC3339 formatted timestamp, including UTC offset, of the instant in which the order was placed.
      */
-    let ocurrentAt: Date
+    let occurredAt: String
     
     /**
      The opaque user ID allows correlating user activity, such as Impressions, Clicks and Purchases, whether or not they
