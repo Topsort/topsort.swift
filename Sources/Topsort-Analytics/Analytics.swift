@@ -3,23 +3,36 @@
 
 import Foundation
 
-private let TOPSORT_URL = "https://api.topsort.ai/v2/events"
-private let TOPSORT_TOKEN = ""
-
-func sendEvents(events: Events) async throws {
-    let url = URL(string: TOPSORT_URL)!
-    var request = URLRequest(url: url)
-    request.setValue(String(format: "Bearer %s", TOPSORT_TOKEN), forHTTPHeaderField: "Authorization")
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.httpMethod = "POST"
-    request.httpBody = try! JSONSerialization.data(withJSONObject: events, options: [])
-    
-    let (data, response) = try! await URLSession.shared.data(for: request)
-    
-    if let httpResponse = response as? HTTPURLResponse {
-        if (httpResponse.statusCode != 200) {
-            let jsonError = try! JSONSerialization.jsonObject(with: data) as! [String: String]
-            throw TopsortError(jsonObject: jsonError)
+public class Analytics {
+    public static let shared = Analytics()
+    @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.opaque-user-id.plist"))
+    private var _opaqueUserId: String?
+    public var opaqueUserId: String {
+        get { 
+            if let oui = _opaqueUserId {
+                return oui
+            } else {
+                let oui = Self.newOpaqueUserId()
+                _opaqueUserId = oui
+                return oui
+            } 
         }
     }
+    private init() {}
+    public func set(opaqueUserId: String?) {
+        self._opaqueUserId = opaqueUserId ?? Self.newOpaqueUserId()
+    }
+    public func configure(apiKey: String, url: String?) {
+        EventManager.shared.configure(apiKey: apiKey, url: url)
+    }
+    public func track(impression event: Event) {
+        EventManager.shared.push(event: .impression(event))
+    }
+    public func track(click event: Event) {
+        EventManager.shared.push(event: .click(event))
+    }
+    public func track(purchase event: PurchaseEvent) {
+        EventManager.shared.push(event: .purchase(event))
+    }
+    private static func newOpaqueUserId() -> String { UUID().uuidString }
 }

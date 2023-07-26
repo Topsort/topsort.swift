@@ -1,15 +1,15 @@
 /**
- Topsort Events API models based on our public API: https://docs.topsort.com/reference/reportevents-1
+ Topsort Events API models based on our public API: https://docs.topsort.com/reference/reportevents-2
  */
 
 import Foundation
 
-enum EntityType : String, Codable {
+public enum EntityType : String, Codable {
     case product
     case vendor
 }
 
-struct Placement: Codable {
+public struct Placement: Codable {
     /**
      URL path of the page triggering the event.
      
@@ -51,7 +51,7 @@ struct Placement: Codable {
      */
     let searchQuery: String?
     
-    init(path: String, position: Int? = nil, page: Int? = nil, pageSize: Int? = nil, productId: String? = nil, categoryIds: [String]? = nil, searchQuery: String? = nil) {
+    public init(path: String, position: Int? = nil, page: Int? = nil, pageSize: Int? = nil, productId: String? = nil, categoryIds: [String]? = nil, searchQuery: String? = nil) {
         self.path = path
         self.position = position
         self.page = page
@@ -62,12 +62,12 @@ struct Placement: Codable {
     }
 }
 
-struct Entity : Codable {
+public struct Entity : Codable {
     let type: EntityType
     let id: String
 }
 
-struct Event : Codable {
+public struct Event : Codable {
     /**
      The entity associated with the promotable over which the interaction occurred.
      It will be ignored if resolvedBidId is not blank.
@@ -77,7 +77,8 @@ struct Event : Codable {
     /**
      RFC3339 formatted timestamp including UTC offset.
      */
-    let occurredAt: String
+    @TSDateValue
+    var occurredAt: Date
     
     /**
      The opaque user ID allows correlating user activity, such as Impressions, Clicks and Purchases, whether or not they
@@ -101,26 +102,26 @@ struct Event : Codable {
     
     let placement: Placement?
 
-    init(entity: Entity, occurredAt: String, opaqueUserId: String, placement: Placement? = nil) {
+    public init(entity: Entity, occurredAt: Date, placement: Placement? = nil) {
         self.entity = entity
         self.occurredAt = occurredAt
-        self.opaqueUserId = opaqueUserId
+        self.opaqueUserId = Analytics.shared.opaqueUserId
         self.resolvedBidId = nil
         self.placement = placement
         self.id = UUID()
     }
     
-    init(resolvedBidId: String, occurredAt: String, opaqueUserId: String, placement: Placement? = nil) {
+    public init(resolvedBidId: String, occurredAt: Date, placement: Placement? = nil) {
         self.entity = nil
         self.occurredAt = occurredAt
-        self.opaqueUserId = opaqueUserId
+        self.opaqueUserId = Analytics.shared.opaqueUserId
         self.resolvedBidId = resolvedBidId
         self.placement = placement
         self.id = UUID()
     }
 }
 
-struct PurchaseItem : Codable {
+public struct PurchaseItem : Codable {
     ///The marketplace ID of the product being purchased.
     let productId: String
 
@@ -130,18 +131,19 @@ struct PurchaseItem : Codable {
     /// The price of a single item in the marketplace currency.
     let unitPrice: Double
     
-    init(productId: String, unitPrice: Double, quantity: Int? = nil) {
+    public init(productId: String, unitPrice: Double, quantity: Int? = nil) {
         self.productId = productId
         self.quantity = quantity
         self.unitPrice = unitPrice
     }
 }
 
-struct PurchaseEvent : Codable {
+public struct PurchaseEvent : Codable {
     /**
      RFC3339 formatted timestamp, including UTC offset, of the instant in which the order was placed.
      */
-    let occurredAt: String
+    @TSDateValue
+    var occurredAt: Date
     
     /**
      The opaque user ID allows correlating user activity, such as Impressions, Clicks and Purchases, whether or not they
@@ -161,6 +163,12 @@ struct PurchaseEvent : Codable {
      unique string that does not change if the event needs to be resent.
      */
     let id: UUID
+    public init(items: [PurchaseItem], occurredAt: Date) {
+        self.items = items
+        self.occurredAt = occurredAt
+        self.opaqueUserId = Analytics.shared.opaqueUserId
+        self.id = UUID()
+    }
 }
 
 struct Events : Codable {
