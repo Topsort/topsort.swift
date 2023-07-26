@@ -5,7 +5,11 @@ import PackageDescription
 
 let package = Package(
     name: "Topsort-Analytics",
-    platforms: [.iOS("13.0")],
+    platforms: [
+        .macOS("10.15"),
+        .iOS("13.0"),
+        .tvOS("11.0"),
+        .watchOS("7.1")],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(

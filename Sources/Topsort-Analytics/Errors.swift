@@ -7,31 +7,35 @@
 
 import Foundation
 
-enum TopsortError : Error {
-    case badRequest(message: String?)
-    case emptyRequest(message: String?)
-    case internalServerError(message: String?)
-    case invalidApiKey(message: String?)
-    case resolvedBidIdNotFound(message: String?)
-    case invalidEventType(message: String?)
-    case unknownError(message: String?)
-    
-    init(jsonObject: [String: String]) {
-        switch(jsonObject["errCode"]) {
+struct TopsortError : Error, Decodable {
+    let message: String
+    let errCode: TopsortErrorCode
+}
+enum TopsortErrorCode: Decodable {
+    case badRequest
+    case emptyRequest
+    case internalServerError
+    case invalidApiKey
+    case resolvedBidIdNotFound
+    case invalidEventType
+    case unknownError(code: String)
+
+    public init?(rawValue: String) {
+        switch(rawValue) {
         case "bad_request":
-            self = .badRequest(message: jsonObject["message"])
+            self = .badRequest
         case "empty_request":
-            self = .emptyRequest(message: jsonObject["message"])
+            self = .emptyRequest
         case "internal_server_error":
-            self = .internalServerError(message: jsonObject["message"])
+            self = .internalServerError
         case "invalid_api_key":
-            self = .invalidApiKey(message: jsonObject["message"])
+            self = .invalidApiKey
         case "resolved_bid_id_not_found":
-            self = .resolvedBidIdNotFound(message: jsonObject["message"])
+            self = .resolvedBidIdNotFound
         case "invalid_event_type":
-            self = .invalidEventType(message: jsonObject["message"])
+            self = .invalidEventType
         default:
-            self = .unknownError(message: nil)
+            self = .unknownError(code: rawValue)
         }
     }
 }
