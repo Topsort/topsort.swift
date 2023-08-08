@@ -1,0 +1,22 @@
+name: Github Actions
+on:
+  pull_request:
+    paths:
+      - .github/workflows/*
+
+jobs:
+  actionlint:
+    name: Actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Actionlint
+        env:
+          version: "1.6.25"
+        run: curl -Ls "https://github.com/rhysd/actionlint/releases/download/v${{ env.version }}/actionlint_${{ env.version }}_linux_amd64.tar.gz" | sudo tar -x -z -C /usr/local/bin actionlint
+
+      - name: Run Actionlint
+        run: |
+          echo "::add-matcher::.github/matchers/actionlint.json"
+          actionlint -color
