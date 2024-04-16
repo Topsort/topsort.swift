@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Pablo Reszczynski on 10-05-23.
-//
-
 import Foundation
 
 struct TopsortError : Error, Decodable {

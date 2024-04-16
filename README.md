@@ -1,34 +1,87 @@
 # Analytics.swift
 
-## Objectives
+## Install
 
-- Easy-to-use, just configure and go iOS analytics library.
-- Support for multiple iOS versions.
-  - No async/await sadly :(
-- Support for both SwiftUI and UIKit.
-- Support for Objective-C even.
-- User can send events manually, but also automatically track events.
-- Distribution via Swift packages, cocoa pods, and carthage.
-- CI / CD via Github Actions.
-  - Maybe even use fastlane.
+### Using package.swift
 
-## Tasks
+```swift
+let package = Package(
+    ...
+    dependencies: [
+        .package(url: "https://github.com/Topsort/analytics.swift.git", from: "1.0.0"),
+    ]
+    ...
+)
+```
 
-- [ ] Topsort events API client
-  - No need to use OpenAPI generator
-  - [x] API Models
-    - [x] Tests
-  - [x] Map API Errors
-    - [ ] Tests
-  - [ ] Simple function that send events to the Topsort API. No need for a class for now.
-    - [ ] Tests
-  - [ ] Main class with configuration (API Key, optional custom host, etc)
-    - [ ] Tests
+## Usage
 
-## Questions
+### With SwiftUI
 
-- How do we achieve global compatibility?
-  - Is there an LTS swift / iOS version?
-    - Segment uses 13.0
-- How can we inspect the main view for products?
-  - Does it work the same on SwiftUI and UIKit?
+```swift
+import SwiftUI
+import Topsort_Analytics
+
+@main
+struct MyApp: App {
+    init() {
+        Analytics.shared.configure(apiKey: "your-api-key", url: "https://api.topsort.com")
+    }
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+
+struct ContentView: View {
+    var myProduct = Product(id: "123", image_url: URL(string: "https://loremflickr.com/640/480?lock=1234")!, name: "My Product", resolvedBidId: "123", price: 12.00)
+    var body: some View {
+        VStack {
+            ProductView(product: myProduct)
+            Button("Purchase me!") {
+                let item = PurchaseItem(productId: myProduct.id, unitPrice: myProduct.price)
+                let event = PurchaseEvent(items: [item], occurredAt: Date.now)
+                Analytics.shared.track(purchase: event)
+            }
+        }
+        .padding()
+    }
+}
+
+struct Product {
+    let id: String
+    let image_url: URL
+    let name: String
+    let resolvedBidId: String?
+    let price: Double
+}
+
+struct ProductView: View {
+    @State
+    public var product: Product
+    
+    private func event() -> Event {
+        var event: Event;
+        if (self.product.resolvedBidId != nil) {
+            event = Event(resolvedBidId: self.product.resolvedBidId!, occurredAt: Date.now)
+        } else {
+            event = Event(entity: Entity(type: EntityType.product, id: self.product.id), occurredAt: Date.now)
+        }
+        return event
+    }
+    
+    var body: some View {
+        VStack {
+            AsyncImage(url: self.product.image_url)
+            Text(self.product.name)
+        }
+        .onAppear {
+            Analytics.shared.track(impression: self.event())
+        }
+        .onTapGesture {
+            Analytics.shared.track(click: self.event())
+        }
+    }
+}
+```

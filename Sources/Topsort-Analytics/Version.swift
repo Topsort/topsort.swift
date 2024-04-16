@@ -1,2 +1,2 @@
 
-internal let __analytics_version = "0.1.0"
+internal let __analytics_version = "0.1.1"
