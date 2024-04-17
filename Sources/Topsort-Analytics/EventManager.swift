@@ -123,8 +123,8 @@ class EventManager {
             let pendingEvents = PendingEvents(id: id, data: data, createdAt: Date(), retries: 0, lastRetry: Date())
             self.pendingEvents[id] = pendingEvents
             self.inProgress.insert(id)
-            
-            self.client.post(url: self.url, data: data, callback: { r in 
+
+            self.client.post(url: self.url, data: data, callback: { r in
                 self.process_response(id: id, result: r)
             })
             self.eventQueue = []
@@ -168,7 +168,7 @@ class EventManager {
                 .prefix(MAX_IN_PROGRESS - self.inProgress.count)
             for pendingEvent in pendingEvents {
                 self.inProgress.insert(pendingEvent.id)
-                self.client.post(url: self.url, data: pendingEvent.data, callback: { r in 
+                self.client.post(url: self.url, data: pendingEvent.data, callback: { r in
                     self.process_response(id: pendingEvent.id, result: r)
                 })
             }

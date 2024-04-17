@@ -9,7 +9,7 @@ final class analytics_swiftTests: XCTestCase {
         // Defining Test Cases and Test Methods
         // https://developer.apple.com/documentation/xctest/defining_test_cases_and_test_methods
     }
-    
+
     func testEncodeModels() throws {
         let date = Date()
         let iso8601DateFormatter = ISO8601DateFormatter()
@@ -19,10 +19,10 @@ final class analytics_swiftTests: XCTestCase {
         Analytics.shared.set(opaqueUserId: "user-id")
 
         let myEvent = Event(entity: Entity(type: EntityType.product, id: "product-id"), occurredAt: date)
-        
+
         let jsonData = try! JSONEncoder().encode(myEvent)
         let decoded = try! JSONSerialization.jsonObject(with: jsonData, options: []) as! [String: Any]
-        
+
         XCTAssertEqual(decoded["opaqueUserId"] as! String, "user-id")
         XCTAssertEqual((decoded["entity"] as! [String: Any])["type"] as! String, "product")
         XCTAssertEqual(decoded["occurredAt"] as! String, occurredAt)
@@ -39,7 +39,7 @@ final class analytics_swiftTests: XCTestCase {
             pe.stop()
             q.asyncAfter(deadline: .now() + 2, execute: {
                 completed = true
-                semaphore.signal() 
+                semaphore.signal()
             })
         }
         semaphore.wait()
