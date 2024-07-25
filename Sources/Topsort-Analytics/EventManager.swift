@@ -1,6 +1,6 @@
 import Foundation
 
-private let TOPSORT_URL = URL(string: "https://api.topsort.com/v2/events")!
+private let EVENTS_TOPSORT_URL = URL(string: "https://api.topsort.com/v2/events")!
 
 enum EventItem: Codable {
     case click(Event)
@@ -86,12 +86,12 @@ class EventManager {
         self.client = HTTPClient(apiKey: nil)
         self.periodicEvent.start()
     }
-    private var url: URL = TOPSORT_URL
+    private var url: URL = EVENTS_TOPSORT_URL
     private var client: HTTPClient
     public func configure(apiKey: String, url: String?) {
         self.client.apiKey = apiKey
         if let url = url {
-            guard let url = URL(string: url) else {
+            guard let url = URL(string: "\(url)/events") else {
                 fatalError("Invalid URL")
             }
             self.url = url
