@@ -9,8 +9,8 @@ class AuctionManager {
     private init() {
         self.client = HTTPClient(apiKey: nil)
     }
-    private var url: URL = AUCTIONS_TOPSORT_URL
-    private var client: HTTPClient
+    internal var url: URL = AUCTIONS_TOPSORT_URL
+    internal var client: HTTPClient
 
     public func configure(apiKey: String, url: String?) {
         self.client.apiKey = apiKey
