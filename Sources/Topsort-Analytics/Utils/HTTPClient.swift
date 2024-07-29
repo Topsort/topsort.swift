@@ -42,6 +42,19 @@ class HTTPClient {
         self.apiKey = apiKey
         self.session = URLSession(configuration: .ephemeral, delegate: nil, delegateQueue: nil)
     }
+
+    public func asyncPost(url: URL, data: Data) async throws -> Data? {
+        var request = newRequest(url: url, method: "POST")
+        request.httpBody = data
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HTTPClientError.unknown(error: NSError(domain: "HTTPClient", code: 0, userInfo: nil), data: ErrorData(data: data))
+        }
+        if httpResponse.statusCode >= 400 {
+            throw HTTPClientError.statusCode(code: httpResponse.statusCode, data: ErrorData(data: data))
+        }
+        return data
+    }
 }
 
 
@@ -75,17 +88,5 @@ extension HTTPClient {
             callback(.success(data))
         }
         task.resume()
-    }
-    public func asyncPost(url: URL, data: Data) async throws -> Data? {
-        var request = newRequest(url: url, method: "POST")
-        request.httpBody = data
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw HTTPClientError.unknown(error: NSError(domain: "HTTPClient", code: 0, userInfo: nil), data: ErrorData(data: data))
-        }
-        if httpResponse.statusCode >= 400 {
-            throw HTTPClientError.statusCode(code: httpResponse.statusCode, data: ErrorData(data: data))
-        }
-        return data
     }
 }

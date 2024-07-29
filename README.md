@@ -16,7 +16,7 @@ let package = Package(
 
 ## Usage
 
-### With SwiftUI
+### Setup
 
 ```swift
 import SwiftUI
@@ -33,7 +33,75 @@ struct MyApp: App {
         }
     }
 }
+```
 
+### Auctions
+
+View all auction models and their definitions in the [Swift package link](https://github.com/Topsort/analytics.swift/blob/main/Sources/Topsort-Analytics/Models/Auctions.swift).
+
+```swift
+import SwiftUI
+import Topsort_Analytics
+
+let products = AuctionProducts(ids: ["p_dsad", "p_dvra", "p_oplf", "p_gjfo"])
+
+let category = AuctionCategory(id: "c_fdfa")
+
+let auctions = [
+    Auction(type: "banners", slots: 1, slotId: "home-banner", device: "mobile", category: category),
+    Auction(type: "listings", slots: 2, device: "mobile", products: products)
+]
+let result: AuctionResponse = await Analytics.shared.executeAuctions(auctions: auctions)
+
+```
+
+### Events
+
+View all event models and their definitions in the [Swift package link](https://github.com/Topsort/analytics.swift/blob/main/Sources/Topsort-Analytics/Models/Events.swift).
+
+#### Impression & click
+
+```swift
+struct Product {
+    let id: String
+    let image_url: URL
+    let name: String
+    let resolvedBidId: String?
+    let price: Double
+}
+
+struct ProductView: View {
+    @State
+    public var product: Product
+
+    private func event() -> Event {
+        var event: Event;
+        if (self.product.resolvedBidId != nil) {
+            event = Event(resolvedBidId: self.product.resolvedBidId!, occurredAt: Date.now)
+        } else {
+            event = Event(entity: Entity(type: EntityType.product, id: self.product.id), occurredAt: Date.now)
+        }
+        return event
+    }
+
+    var body: some View {
+        VStack {
+            AsyncImage(url: self.product.image_url)
+            Text(self.product.name)
+        }
+        .onAppear {
+            Analytics.shared.track(impression: self.event())
+        }
+        .onTapGesture {
+            Analytics.shared.track(click: self.event())
+        }
+    }
+}
+```
+
+#### Purchase
+
+```swift
 struct ContentView: View {
     var myProduct = Product(id: "123", image_url: URL(string: "https://loremflickr.com/640/480?lock=1234")!, name: "My Product", resolvedBidId: "123", price: 12.00)
     var body: some View {
@@ -46,42 +114,6 @@ struct ContentView: View {
             }
         }
         .padding()
-    }
-}
-
-struct Product {
-    let id: String
-    let image_url: URL
-    let name: String
-    let resolvedBidId: String?
-    let price: Double
-}
-
-struct ProductView: View {
-    @State
-    public var product: Product
-    
-    private func event() -> Event {
-        var event: Event;
-        if (self.product.resolvedBidId != nil) {
-            event = Event(resolvedBidId: self.product.resolvedBidId!, occurredAt: Date.now)
-        } else {
-            event = Event(entity: Entity(type: EntityType.product, id: self.product.id), occurredAt: Date.now)
-        }
-        return event
-    }
-    
-    var body: some View {
-        VStack {
-            AsyncImage(url: self.product.image_url)
-            Text(self.product.name)
-        }
-        .onAppear {
-            Analytics.shared.track(impression: self.event())
-        }
-        .onTapGesture {
-            Analytics.shared.track(click: self.event())
-        }
     }
 }
 ```
