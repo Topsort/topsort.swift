@@ -6,8 +6,8 @@ import PackageDescription
 let package = Package(
     name: "Topsort-Analytics",
     platforms: [
-        .macOS("10.15"),
-        .iOS("13.0"),
+        .macOS("12.00"),
+        .iOS("15.0"),
         .tvOS("11.0"),
         .watchOS("7.1")],
     products: [
@@ -15,6 +15,10 @@ let package = Package(
         .library(
             name: "Topsort-Analytics",
             targets: ["Topsort-Analytics"]),
+        .library(
+            name: "TopsortBanners",
+            targets: ["TopsortBanners"]
+        )
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -24,5 +28,12 @@ let package = Package(
         .testTarget(
             name: "analytics.swiftTests",
             dependencies: ["Topsort-Analytics"]),
+        .target(
+            name: "TopsortBanners",
+            dependencies: ["Topsort-Analytics"]),
+        // .testTarget(
+        //     name: "banners.swiftTests",
+        //     dependencies: ["Topsort-Banners"])
+
     ]
 )
