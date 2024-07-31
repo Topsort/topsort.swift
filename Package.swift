@@ -31,9 +31,9 @@ let package = Package(
         .target(
             name: "TopsortBanners",
             dependencies: ["Topsort-Analytics"]),
-        // .testTarget(
-        //     name: "banners.swiftTests",
-        //     dependencies: ["Topsort-Banners"])
+        .testTarget(
+            name: "banners.swiftTests",
+            dependencies: ["TopsortBanners", "Topsort-Analytics"]),
 
     ]
 )
