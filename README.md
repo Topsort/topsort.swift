@@ -117,3 +117,26 @@ struct ContentView: View {
     }
 }
 ```
+
+### Banners
+
+```swift
+import TopsortBanners
+
+struct ContentView: View {
+    var body: some View {
+        TopsortBanner(
+            apiKey: "API_KEY",
+            url: "https://api.topsort.com/v2",
+            width: widht,
+            height: height,
+            slotId: "slotId",
+            deviceType: "device"
+        ) { response in
+            // function to execute when banner is clicked
+        }
+    }
+}
+```
+
+This code will display a banner, send an impression event when the banner is shown, and send a click event when the banner is clicked. Inside the callback, you can add logic to execute when the banner is clicked, such as redirecting to the product page.

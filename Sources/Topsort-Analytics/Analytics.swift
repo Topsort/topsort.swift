@@ -1,6 +1,18 @@
 import Foundation
 
-public class Analytics {
+
+public protocol AnalyticsProtocol {
+    var opaqueUserId: String { get }
+    func set(opaqueUserId: String?)
+    func configure(apiKey: String, url: String?)
+    func track(impression event: Event)
+    func track(click event: Event)
+    func track(purchase event: PurchaseEvent)
+    func executeAuctions(auctions: [Auction]) async -> AuctionResponse?
+}
+
+
+public class Analytics: AnalyticsProtocol {
     public static let shared = Analytics()
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.opaque-user-id.plist"))
     private var _opaqueUserId: String?
