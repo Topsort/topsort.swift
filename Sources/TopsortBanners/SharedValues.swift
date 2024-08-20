@@ -1,5 +1,5 @@
 import Foundation
-import Topsort_Analytics
+import Topsort
 
 class SharedValues: ObservableObject {
     @Published var resolvedBidId: String?

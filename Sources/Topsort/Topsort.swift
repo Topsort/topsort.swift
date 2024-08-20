@@ -1,7 +1,7 @@
 import Foundation
 
 
-public protocol AnalyticsProtocol {
+public protocol TopsortProtocol {
     var opaqueUserId: String { get }
     func set(opaqueUserId: String?)
     func configure(apiKey: String, url: String?)
@@ -12,8 +12,8 @@ public protocol AnalyticsProtocol {
 }
 
 
-public class Analytics: AnalyticsProtocol {
-    public static let shared = Analytics()
+public class Topsort: TopsortProtocol {
+    public static let shared = Topsort()
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.opaque-user-id.plist"))
     private var _opaqueUserId: String?
     public var opaqueUserId: String {

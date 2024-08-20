@@ -1,6 +1,6 @@
 import XCTest
+@testable import Topsort
 @testable import TopsortBanners
-@testable import Topsort_Analytics
 
 class TopsortBannerTests: XCTestCase {
 
@@ -32,9 +32,9 @@ class TopsortBannerTests: XCTestCase {
         let auctionResult = AuctionResult(resultType: "result_type", winners: [winner], error: false)
         let auctionResponse = AuctionResponse(results: [auctionResult])
 
-        // Mock Analytics and response
-        let mockAnalytics = MockAnalytics()
-        mockAnalytics.executeAuctionsMockResponse = auctionResponse
+        // Mock Topsort and response
+        let mockTopsort = MockTopsort()
+        mockTopsort.executeAuctionsMockResponse = auctionResponse
 
         let banner = await TopsortBanner(
             apiKey: "test_api_key",
@@ -45,7 +45,7 @@ class TopsortBannerTests: XCTestCase {
             deviceType: "test_device_type",
             buttonClickedAction: { response in
             },
-            analytics: mockAnalytics
+            topsort: mockTopsort
         )
 
         // Execute the method

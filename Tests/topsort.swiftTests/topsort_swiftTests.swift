@@ -1,7 +1,7 @@
 import XCTest
-@testable import Topsort_Analytics
+@testable import Topsort
 
-final class analytics_swiftTests: XCTestCase {
+final class topsort_swiftTests: XCTestCase {
     func testExample() throws {
         // XCTest Documenation
         // https://developer.apple.com/documentation/xctest
@@ -16,7 +16,7 @@ final class analytics_swiftTests: XCTestCase {
         iso8601DateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let occurredAt = iso8601DateFormatter.string(from: date)
 
-        Analytics.shared.set(opaqueUserId: "user-id")
+        Topsort.shared.set(opaqueUserId: "user-id")
 
         let myEvent = Event(entity: Entity(type: EntityType.product, id: "product-id"), occurredAt: date)
 

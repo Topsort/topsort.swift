@@ -65,7 +65,7 @@ public struct Placement: Codable {
 public struct Entity : Codable {
     let type: EntityType
     let id: String
-    
+
     public init(type: EntityType, id: String) {
         self.type = type
         self.id = id
@@ -110,7 +110,7 @@ public struct Event : Codable {
     public init(entity: Entity, occurredAt: Date, placement: Placement? = nil) {
         self.entity = entity
         self.occurredAt = occurredAt
-        self.opaqueUserId = Analytics.shared.opaqueUserId
+        self.opaqueUserId = Topsort.shared.opaqueUserId
         self.resolvedBidId = nil
         self.placement = placement
         self.id = UUID()
@@ -119,7 +119,7 @@ public struct Event : Codable {
     public init(resolvedBidId: String, occurredAt: Date, placement: Placement? = nil) {
         self.entity = nil
         self.occurredAt = occurredAt
-        self.opaqueUserId = Analytics.shared.opaqueUserId
+        self.opaqueUserId = Topsort.shared.opaqueUserId
         self.resolvedBidId = resolvedBidId
         self.placement = placement
         self.id = UUID()
@@ -171,7 +171,7 @@ public struct PurchaseEvent : Codable {
     public init(items: [PurchaseItem], occurredAt: Date) {
         self.items = items
         self.occurredAt = occurredAt
-        self.opaqueUserId = Analytics.shared.opaqueUserId
+        self.opaqueUserId = Topsort.shared.opaqueUserId
         self.id = UUID()
     }
 }

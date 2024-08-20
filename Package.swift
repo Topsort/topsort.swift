@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "Topsort-Analytics",
+    name: "Topsort",
     platforms: [
         .macOS("12.00"),
         .iOS("15.0"),
@@ -13,8 +13,8 @@ let package = Package(
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "Topsort-Analytics",
-            targets: ["Topsort-Analytics"]),
+            name: "Topsort",
+            targets: ["Topsort"]),
         .library(
             name: "TopsortBanners",
             targets: ["TopsortBanners"]
@@ -24,16 +24,16 @@ let package = Package(
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "Topsort-Analytics"),
+            name: "Topsort"),
         .testTarget(
-            name: "analytics.swiftTests",
-            dependencies: ["Topsort-Analytics"]),
+            name: "topsort.swiftTests",
+            dependencies: ["Topsort"]),
         .target(
             name: "TopsortBanners",
-            dependencies: ["Topsort-Analytics"]),
+            dependencies: ["Topsort"]),
         .testTarget(
             name: "banners.swiftTests",
-            dependencies: ["TopsortBanners", "Topsort-Analytics"]),
+            dependencies: ["TopsortBanners", "Topsort"]),
 
     ]
 )

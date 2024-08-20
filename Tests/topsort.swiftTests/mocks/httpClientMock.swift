@@ -1,5 +1,5 @@
 import Foundation
-@testable import Topsort_Analytics
+@testable import Topsort
 
 class MockHTTPClient: HTTPClient {
     var postCalled = false
