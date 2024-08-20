@@ -1,6 +1,6 @@
 import XCTest
 @testable import TopsortBanners
-@testable import Topsort_Analytics
+@testable import Topsort
 
 class SharedValuesTests: XCTestCase {
 

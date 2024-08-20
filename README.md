@@ -20,12 +20,12 @@ let package = Package(
 
 ```swift
 import SwiftUI
-import Topsort_Analytics
+import Topsort
 
 @main
 struct MyApp: App {
     init() {
-        Analytics.shared.configure(apiKey: "your-api-key", url: "https://api.topsort.com")
+        Topsort.shared.configure(apiKey: "your-api-key", url: "https://api.topsort.com")
     }
     var body: some Scene {
         WindowGroup {
@@ -37,11 +37,11 @@ struct MyApp: App {
 
 ### Auctions
 
-View all auction models and their definitions in the [Swift package link](https://github.com/Topsort/topsort.swift/blob/main/Sources/Topsort-Analytics/Models/Auctions.swift).
+View all auction models and their definitions in the [Swift package link](https://github.com/Topsort/topsort.swift/blob/main/Sources/Topsort/Models/Auctions.swift).
 
 ```swift
 import SwiftUI
-import Topsort_Analytics
+import Topsort
 
 let products = AuctionProducts(ids: ["p_dsad", "p_dvra", "p_oplf", "p_gjfo"])
 
@@ -51,13 +51,13 @@ let auctions = [
     Auction(type: "banners", slots: 1, slotId: "home-banner", device: "mobile", category: category),
     Auction(type: "listings", slots: 2, device: "mobile", products: products)
 ]
-let result: AuctionResponse = await Analytics.shared.executeAuctions(auctions: auctions)
+let result: AuctionResponse = await Topsort.shared.executeAuctions(auctions: auctions)
 
 ```
 
 ### Events
 
-View all event models and their definitions in the [Swift package link](https://github.com/Topsort/topsort.swift/blob/main/Sources/Topsort-Analytics/Models/Events.swift).
+View all event models and their definitions in the [Swift package link](https://github.com/Topsort/topsort.swift/blob/main/Sources/Topsort/Models/Events.swift).
 
 #### Impression & click
 
@@ -90,10 +90,10 @@ struct ProductView: View {
             Text(self.product.name)
         }
         .onAppear {
-            Analytics.shared.track(impression: self.event())
+            Topsort.shared.track(impression: self.event())
         }
         .onTapGesture {
-            Analytics.shared.track(click: self.event())
+            Topsort.shared.track(click: self.event())
         }
     }
 }
@@ -110,7 +110,7 @@ struct ContentView: View {
             Button("Purchase me!") {
                 let item = PurchaseItem(productId: myProduct.id, unitPrice: myProduct.price)
                 let event = PurchaseEvent(items: [item], occurredAt: Date.now)
-                Analytics.shared.track(purchase: event)
+                Topsort.shared.track(purchase: event)
             }
         }
         .padding()

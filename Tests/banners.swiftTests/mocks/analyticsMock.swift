@@ -1,8 +1,7 @@
 import Foundation
 import XCTest
-@testable import Topsort_Analytics
-
-public class MockAnalytics: AnalyticsProtocol {
+@testable import Topsort
+public class MockTopsort: TopsortProtocol {
     public var opaqueUserId: String = "mocked-opaque-user-id"
     public var executeAuctionsMockResponse: AuctionResponse?
 
