@@ -1,4 +1,4 @@
-# Analytics.swift
+# topsort.swift
 
 ## Install
 
@@ -8,7 +8,7 @@
 let package = Package(
     ...
     dependencies: [
-        .package(url: "https://github.com/Topsort/analytics.swift.git", from: "1.0.0"),
+        .package(url: "https://github.com/Topsort/topsort.swift.git", from: "1.0.0"),
     ]
     ...
 )
@@ -37,7 +37,7 @@ struct MyApp: App {
 
 ### Auctions
 
-View all auction models and their definitions in the [Swift package link](https://github.com/Topsort/analytics.swift/blob/main/Sources/Topsort-Analytics/Models/Auctions.swift).
+View all auction models and their definitions in the [Swift package link](https://github.com/Topsort/topsort.swift/blob/main/Sources/Topsort-Analytics/Models/Auctions.swift).
 
 ```swift
 import SwiftUI
@@ -57,7 +57,7 @@ let result: AuctionResponse = await Analytics.shared.executeAuctions(auctions: a
 
 ### Events
 
-View all event models and their definitions in the [Swift package link](https://github.com/Topsort/analytics.swift/blob/main/Sources/Topsort-Analytics/Models/Events.swift).
+View all event models and their definitions in the [Swift package link](https://github.com/Topsort/topsort.swift/blob/main/Sources/Topsort-Analytics/Models/Events.swift).
 
 #### Impression & click
 
