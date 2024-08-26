@@ -1,9 +1,10 @@
 import Foundation
 
-struct TopsortError : Error, Decodable {
+struct TopsortError: Error, Decodable {
     let message: String
     let errCode: TopsortErrorCode
 }
+
 enum TopsortErrorCode: Decodable {
     case badRequest
     case emptyRequest
@@ -14,7 +15,7 @@ enum TopsortErrorCode: Decodable {
     case unknownError(code: String)
 
     public init?(rawValue: String) {
-        switch(rawValue) {
+        switch rawValue {
         case "bad_request":
             self = .badRequest
         case "empty_request":

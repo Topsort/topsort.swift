@@ -1,5 +1,5 @@
-import XCTest
 @testable import Topsort
+import XCTest
 
 final class topsort_swiftTests: XCTestCase {
     func testExample() throws {
@@ -37,10 +37,10 @@ final class topsort_swiftTests: XCTestCase {
         let semaphore = DispatchSemaphore(value: 0)
         q.asyncAfter(deadline: .now() + 3.5) {
             pe.stop()
-            q.asyncAfter(deadline: .now() + 2, execute: {
+            q.asyncAfter(deadline: .now() + 2) {
                 completed = true
                 semaphore.signal()
-            })
+            }
         }
         semaphore.wait()
         XCTAssert(completed)

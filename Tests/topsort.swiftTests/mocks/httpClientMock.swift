@@ -11,13 +11,13 @@ class MockHTTPClient: HTTPClient {
         super.init(apiKey: apiKey)
     }
 
-    override func asyncPost(url: URL, data: Data) async throws -> Data? {
+    override func asyncPost(url _: URL, data: Data) async throws -> Data? {
         postCalled = true
         postData = data
         switch postResult {
-        case .success(let data):
+        case let .success(data):
             return data
-        case .failure(let error):
+        case let .failure(error):
             throw error
         case .none:
             return nil

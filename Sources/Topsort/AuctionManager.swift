@@ -7,13 +7,14 @@ private let MAX_AUCTIONS = 5
 class AuctionManager {
     public static let shared = AuctionManager()
     private init() {
-        self.client = HTTPClient(apiKey: nil)
+        client = HTTPClient(apiKey: nil)
     }
-    internal var url: URL = AUCTIONS_TOPSORT_URL
-    internal var client: HTTPClient
+
+    var url: URL = AUCTIONS_TOPSORT_URL
+    var client: HTTPClient
 
     public func configure(apiKey: String, url: String?) {
-        self.client.apiKey = apiKey
+        client.apiKey = apiKey
         if let url = url {
             guard let url = URL(string: "\(url)/auctions") else {
                 fatalError("Invalid URL")
@@ -34,8 +35,8 @@ class AuctionManager {
         }
 
         do {
-            let resultData = try await self.client.asyncPost(url: self.url, data: auctionsData)
-            response = try self.process_response(result: .success(resultData))
+            let resultData = try await client.asyncPost(url: url, data: auctionsData)
+            response = try process_response(result: .success(resultData))
         } catch {
             print("Error posting auctions: \(error)")
         }
@@ -44,15 +45,15 @@ class AuctionManager {
 
     private func process_response(result: Result<Data?, HTTPClientError>) throws -> AuctionResponse? {
         switch result {
-            case .success(let data):
-                if data == nil {
-                    throw HTTPClientError.unknown(error: NSError(domain: "HTTPClient", code: 0, userInfo: nil), data: ErrorData(data: data))
-                }
-                let resultData = decodeAuctionResponse(data: data!)
-                return resultData
-            case .failure(let error):
-                print("failed to send auctions: \(error)")
-                return nil
+        case let .success(data):
+            if data == nil {
+                throw HTTPClientError.unknown(error: NSError(domain: "HTTPClient", code: 0, userInfo: nil), data: ErrorData(data: data))
+            }
+            let resultData = decodeAuctionResponse(data: data!)
+            return resultData
+        case let .failure(error):
+            print("failed to send auctions: \(error)")
+            return nil
         }
     }
 

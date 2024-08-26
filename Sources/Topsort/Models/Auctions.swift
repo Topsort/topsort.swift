@@ -20,15 +20,15 @@ public struct AuctionCategory: Codable {
     let id: String?
 
     /**
-    * An array containing the category IDs of the bids that will participate in an auction.
-    * In order to participate in an auction, a bid product must belong to all of the categories provided in the auction request.
-    */
+     * An array containing the category IDs of the bids that will participate in an auction.
+     * In order to participate in an auction, a bid product must belong to all of the categories provided in the auction request.
+     */
     let ids: [String]?
 
     /**
-    * An array of disjunctions.
-    * In order to participate in an auction, a bid product must belong to at least one of the categories for each of the disjunctions provided in the auction request.
-    */
+     * An array of disjunctions.
+     * In order to participate in an auction, a bid product must belong to at least one of the categories for each of the disjunctions provided in the auction request.
+     */
     let disjunctions: [String]?
 
     public init(id: String? = nil, ids: [String]? = nil, disjunctions: [String]? = nil) {
@@ -40,13 +40,13 @@ public struct AuctionCategory: Codable {
 
 public struct AuctionProducts: Codable {
     /**
-    * The list of product IDs to be considered in the auction.
-    */
+     * The list of product IDs to be considered in the auction.
+     */
     let ids: [String]
 
     /**
-    * The list of quality scores for the products in the auction.
-    */
+     * The list of quality scores for the products in the auction.
+     */
     let qualityScores: [Double]?
 
     public init(ids: [String], qualityScores: [Double]? = nil) {
@@ -60,35 +60,35 @@ public struct AuctionProducts: Codable {
 
 public struct Auction: Codable {
     /**
-    * Discriminator for the type of auction.
-    * Could be one of the following values:
-    * - "listings"
-    * - "banner"
-    */
+     * Discriminator for the type of auction.
+     * Could be one of the following values:
+     * - "listings"
+     * - "banner"
+     */
     let type: String
 
     /**
-    * Specifies the maximum number of auction winners that should be returned.
-    */
+     * Specifies the maximum number of auction winners that should be returned.
+     */
     let slots: Int
 
     /**
-    * The ID of the banner placement for which this auction will be run for.
-    */
+     * The ID of the banner placement for which this auction will be run for.
+     */
     let slotId: String?
 
     /**
-    * Discriminator for the device type.
-    * - "desktop"
-    * - "mobile"
-    */
+     * Discriminator for the device type.
+     * - "desktop"
+     * - "mobile"
+     */
     let device: String?
     let products: AuctionProducts?
     let category: AuctionCategory?
 
     /**
-    * The search string provided by a user.
-    */
+     * The search string provided by a user.
+     */
     let searchQuery: String?
     let geoTargeting: AuctionGeoTargeting?
 

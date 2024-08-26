@@ -12,18 +12,21 @@ class PeriodicEvent {
         self.queue = queue
         self.action = action
     }
+
     func start() {
         Self.serialQueue.async {
             self.isRunning = true
             self.runNext()
         }
     }
+
     func stop() {
         Self.serialQueue.async {
             self.isRunning = false
             self.workItem?.cancel()
         }
     }
+
     private func runNext() {
         Self.serialQueue.async {
             guard self.isRunning else { return }
@@ -33,8 +36,9 @@ class PeriodicEvent {
             self.queue.asyncAfter(deadline: .now() + self.interval, execute: workItem)
         }
     }
+
     private func process() {
-        self.action()
-        self.runNext()
+        action()
+        runNext()
     }
 }

@@ -9,16 +9,15 @@ public class FilePersistedValue<T: Codable> {
     private let serialQueue = DispatchQueue(label: "com.topsort.analytics.FilePersistedValue")
     private let storePath: String
     private var value: T?
-    
+
     public init(storePath: String) {
         self.storePath = storePath
         let url = URL(fileURLWithPath: self.storePath)
         do {
             let data = try? Data(contentsOf: url)
-            let value = try data.map({ data in try PropertyListDecoder().decode(PersistedValueWrapper<T>.self, from: data).value })
+            let value = try data.map { data in try PropertyListDecoder().decode(PersistedValueWrapper<T>.self, from: data).value }
             self.value = value
-        } 
-        catch {
+        } catch {
             print("Error loading persisted value: \(error)")
         }
     }
@@ -30,7 +29,7 @@ public class FilePersistedValue<T: Codable> {
             persist()
         }
     }
-    
+
     private func persist() {
         serialQueue.async {
             do {
@@ -39,15 +38,13 @@ public class FilePersistedValue<T: Codable> {
                     try fileManager.removeItem(atPath: self.storePath)
                 }
                 guard let value = self.value
-                    else { return }
+                else { return }
                 let data = try PropertyListEncoder().encode(PersistedValueWrapper(value: value))
                 let url = URL(fileURLWithPath: self.storePath)
                 try data.write(to: url)
-            } 
-            catch {
+            } catch {
                 print("Error persisting value: \(error)")
             }
         }
     }
-
 }

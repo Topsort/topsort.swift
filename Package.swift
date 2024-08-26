@@ -9,16 +9,18 @@ let package = Package(
         .macOS("12.00"),
         .iOS("15.0"),
         .tvOS("11.0"),
-        .watchOS("7.1")],
+        .watchOS("7.1"),
+    ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "Topsort",
-            targets: ["Topsort"]),
+            targets: ["Topsort"]
+        ),
         .library(
             name: "TopsortBanners",
             targets: ["TopsortBanners"]
-        )
+        ),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -27,13 +29,15 @@ let package = Package(
             name: "Topsort"),
         .testTarget(
             name: "topsort.swiftTests",
-            dependencies: ["Topsort"]),
+            dependencies: ["Topsort"]
+        ),
         .target(
             name: "TopsortBanners",
-            dependencies: ["Topsort"]),
+            dependencies: ["Topsort"]
+        ),
         .testTarget(
             name: "banners.swiftTests",
-            dependencies: ["TopsortBanners", "Topsort"]),
-
+            dependencies: ["TopsortBanners", "Topsort"]
+        ),
     ]
 )
