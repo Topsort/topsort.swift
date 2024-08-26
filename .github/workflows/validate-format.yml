@@ -1,0 +1,14 @@
+name: Lint
+on:
+  pull_request:
+    paths:
+      - "**/*.swift"
+      - ".github/workflows/validate-format.yml"
+
+jobs:
+  Lint:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v3
+      - name: SwiftFormat
+        run: swiftformat --lint --reporter github-actions-log .
