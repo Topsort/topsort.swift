@@ -15,7 +15,7 @@ class SharedValues: ObservableObject {
     }
 
     public func setResolvedBidIdAndUrlFromResponse() {
-        guard let response = self.response else {
+        guard let response = response else {
             return
         }
         let results = response.results

@@ -1,6 +1,6 @@
 import Foundation
-import XCTest
 @testable import Topsort
+import XCTest
 
 class AuctionManagerTests: XCTestCase {
     var auctionManager: AuctionManager!

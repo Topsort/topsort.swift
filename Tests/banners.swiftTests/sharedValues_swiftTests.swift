@@ -1,9 +1,8 @@
-import XCTest
-@testable import TopsortBanners
 @testable import Topsort
+@testable import TopsortBanners
+import XCTest
 
 class SharedValuesTests: XCTestCase {
-
     func testSharedValuesInitialization() {
         let sharedValues = SharedValues()
 

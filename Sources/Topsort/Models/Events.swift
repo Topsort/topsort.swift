@@ -4,7 +4,7 @@
 
 import Foundation
 
-public enum EntityType : String, Codable {
+public enum EntityType: String, Codable {
     case product
     case vendor
 }
@@ -62,7 +62,7 @@ public struct Placement: Codable {
     }
 }
 
-public struct Entity : Codable {
+public struct Entity: Codable {
     let type: EntityType
     let id: String
 
@@ -72,7 +72,7 @@ public struct Entity : Codable {
     }
 }
 
-public struct Event : Codable {
+public struct Event: Codable {
     /**
      The entity associated with the promotable over which the interaction occurred.
      It will be ignored if resolvedBidId is not blank.
@@ -110,24 +110,24 @@ public struct Event : Codable {
     public init(entity: Entity, occurredAt: Date, placement: Placement? = nil) {
         self.entity = entity
         self.occurredAt = occurredAt
-        self.opaqueUserId = Topsort.shared.opaqueUserId
-        self.resolvedBidId = nil
+        opaqueUserId = Topsort.shared.opaqueUserId
+        resolvedBidId = nil
         self.placement = placement
-        self.id = UUID()
+        id = UUID()
     }
 
     public init(resolvedBidId: String, occurredAt: Date, placement: Placement? = nil) {
-        self.entity = nil
+        entity = nil
         self.occurredAt = occurredAt
-        self.opaqueUserId = Topsort.shared.opaqueUserId
+        opaqueUserId = Topsort.shared.opaqueUserId
         self.resolvedBidId = resolvedBidId
         self.placement = placement
-        self.id = UUID()
+        id = UUID()
     }
 }
 
-public struct PurchaseItem : Codable {
-    ///The marketplace ID of the product being purchased.
+public struct PurchaseItem: Codable {
+    /// The marketplace ID of the product being purchased.
     let productId: String
 
     /// Count of products purchased.
@@ -143,7 +143,7 @@ public struct PurchaseItem : Codable {
     }
 }
 
-public struct PurchaseEvent : Codable {
+public struct PurchaseEvent: Codable {
     /**
      RFC3339 formatted timestamp, including UTC offset, of the instant in which the order was placed.
      */
@@ -171,12 +171,12 @@ public struct PurchaseEvent : Codable {
     public init(items: [PurchaseItem], occurredAt: Date) {
         self.items = items
         self.occurredAt = occurredAt
-        self.opaqueUserId = Topsort.shared.opaqueUserId
-        self.id = UUID()
+        opaqueUserId = Topsort.shared.opaqueUserId
+        id = UUID()
     }
 }
 
-struct Events : Codable {
+struct Events: Codable {
     let impressions: [Event]?
     let clicks: [Event]?
     let purchases: [PurchaseEvent]?

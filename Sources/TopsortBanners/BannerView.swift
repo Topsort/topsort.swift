@@ -26,7 +26,7 @@ public struct TopsortBanner: View {
         self.buttonClickedAction = buttonClickedAction
         self.topsort = topsort
 
-        self.run(deviceType: deviceType, slotId: slotId)
+        run(deviceType: deviceType, slotId: slotId)
     }
 
     private func run(deviceType: String, slotId: String) {
@@ -35,8 +35,8 @@ public struct TopsortBanner: View {
         }
     }
 
-    internal func executeAuctions(deviceType: String, slotId: String) async {
-        let auction: Auction = Auction(type: "banners", slots: 1, slotId: slotId, device: deviceType)
+    func executeAuctions(deviceType: String, slotId: String) async {
+        let auction = Auction(type: "banners", slots: 1, slotId: slotId, device: deviceType)
         let response = await topsort.executeAuctions(auctions: [auction])
 
         sharedValues.response = response
@@ -50,7 +50,7 @@ public struct TopsortBanner: View {
     private func buttonClicked() async {
         let event = Event(resolvedBidId: sharedValues.resolvedBidId!, occurredAt: Date.now)
         topsort.track(click: event)
-        self.buttonClickedAction(sharedValues.response)
+        buttonClickedAction(sharedValues.response)
     }
 
     public var body: some View {
@@ -67,7 +67,7 @@ public struct TopsortBanner: View {
                         .frame(width: self.width, height: self.height)
                         .clipped()
                 }
-                    .frame(width: self.width, height: self.height)
+                .frame(width: self.width, height: self.height)
             }
         }
     }

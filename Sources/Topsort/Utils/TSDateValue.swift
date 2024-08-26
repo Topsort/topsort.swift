@@ -17,7 +17,7 @@ public struct TSDateValue: Codable {
         let container = try decoder.singleValueContainer()
         let value = try container.decode(String.self)
         if let date = Self.dateFormatter.date(from: value) {
-            self.wrappedValue =  date
+            wrappedValue = date
         } else {
             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid date format"))
         }
@@ -27,6 +27,6 @@ public struct TSDateValue: Codable {
         var container = encoder.singleValueContainer()
         try container.encode(Self.dateFormatter.string(from: wrappedValue))
     }
-    
+
     public var wrappedValue: Date
 }

@@ -1,6 +1,6 @@
 import Foundation
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 
 enum HTTPClientError: Error {
@@ -14,7 +14,7 @@ enum ErrorData {
 }
 
 extension ErrorData {
-    init?(data: Data?){
+    init?(data: Data?) {
         guard let data = data else { return nil }
         if let topsortError = try? JSONDecoder().decode(TopsortError.self, from: data) {
             self = .topsortError(topsortError)
@@ -29,7 +29,7 @@ extension HTTPClientError {
         switch self {
         case .unknown:
             return true
-        case .statusCode(let code, _):
+        case let .statusCode(code, _):
             return code != 400
         }
     }
@@ -40,7 +40,7 @@ class HTTPClient {
     private let session: URLSession
     public init(apiKey: String?) {
         self.apiKey = apiKey
-        self.session = URLSession(configuration: .ephemeral, delegate: nil, delegateQueue: nil)
+        session = URLSession(configuration: .ephemeral, delegate: nil, delegateQueue: nil)
     }
 
     public func asyncPost(url: URL, data: Data) async throws -> Data? {
@@ -57,18 +57,18 @@ class HTTPClient {
     }
 }
 
-
 extension HTTPClient {
     private func newRequest(url: URL, method: String) -> URLRequest {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
         request.httpMethod = method
         request.addValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         request.addValue("analytics-swift/\(__analytics_version)", forHTTPHeaderField: "User-Agent")
-        if let apiKey = self.apiKey {
+        if let apiKey = apiKey {
             request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
         return request
     }
+
     public func post(url: URL, data: Data, callback: @escaping (Result<Data?, HTTPClientError>) -> Void) {
         var request = newRequest(url: url, method: "POST")
         request.httpBody = data
