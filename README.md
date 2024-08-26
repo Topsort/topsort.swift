@@ -128,7 +128,7 @@ struct ContentView: View {
         TopsortBanner(
             apiKey: "API_KEY",
             url: "https://api.topsort.com/v2",
-            width: widht,
+            width: width,
             height: height,
             slotId: "slotId",
             deviceType: "device"
