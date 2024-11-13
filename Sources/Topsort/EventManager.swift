@@ -87,8 +87,8 @@ class EventManager {
         periodicEvent.start()
     }
 
-    private var url: URL = EVENTS_TOPSORT_URL
-    private var client: HTTPClient
+    public var url: URL = EVENTS_TOPSORT_URL
+    public var client: HTTPClient
     public func configure(apiKey: String, url: String?) {
         client.apiKey = apiKey
         if let url = url {
@@ -100,7 +100,9 @@ class EventManager {
     }
 
     public func push(event: EventItem) {
+        //print("push")
         serialQueue.async {
+            //print("process")
             self.eventQueue.append(event)
             self.send()
         }
@@ -113,8 +115,10 @@ class EventManager {
                 return
             }
             if self.eventQueue.isEmpty {
+                print("send empty")
                 return
             }
+            print("send non-empty")
             let events = self.eventQueue.toEvents()
             guard let data = try? JSONEncoder().encode(events) else {
                 print("failed to serialize events: \(events)")
