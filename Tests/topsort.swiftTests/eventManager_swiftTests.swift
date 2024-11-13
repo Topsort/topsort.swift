@@ -2,43 +2,47 @@ import Foundation
 @testable import Topsort
 import XCTest
 
+
+
 class EventSender {
-    private var isRunning = false
     private let queue = DispatchQueue(label: "com.topsort.EventSender", qos: .background)
     private let event: Event
-    private let intervalSeconds: Double
+    @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.event-queue-test.plist"))
+    private var _eventQueue: [EventItem]?
+    private var eventQueue: [EventItem] {
+        get {
+            if let eq = _eventQueue {
+                return eq
+            } else {
+                _eventQueue = []
+                return []
+            }
+        }
+        set {
+            _eventQueue = newValue
+        }
+    }
     
-    init(intervalSeconds: Double = 0.1) {
-        // Create a sample event
+    init() {
         self.event = Event(
             entity: Entity(type: EntityType.product, id: "xpto"), 
             occurredAt: Date.now
         )
-        self.intervalSeconds = intervalSeconds
-    }
-
-    deinit{
-        print(">>>>>>>>>>> eventSender deinit")
     }
     
     func start() {
-        isRunning = true
         queue.async { 
             self.sendEvents()
         }
     }
     
-    func stop() {
-        isRunning = false
-    }
-    
     private func sendEvents() {
-        while isRunning {
-            EventManager.shared.push(event: .click(event))
-            //print("EventSender: Pushed click event")
-            
-            // Sleep for a short interval to prevent overwhelming the system
-            //Thread.sleep(forTimeInterval: intervalSeconds)
+        while true {
+            if Int.random(in: 0...2) == 0 {
+                eventQueue = []
+            } else {
+                eventQueue.append(.click(event))
+            }
         }
     }
 }
@@ -68,13 +72,8 @@ class EventManagerTests: XCTestCase {
     }
     
     func testExecuteEvents() async {
-        var sender: EventSender? = EventSender(intervalSeconds: 0.01)
+        let sender: EventSender? = EventSender()
         sender?.start()
         try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        //sender?.stop()
-        sender = nil   // This will trigger deinit
-        print("stopped")
-        try? await Task.sleep(nanoseconds: 5_000_000_000)
     }
 }

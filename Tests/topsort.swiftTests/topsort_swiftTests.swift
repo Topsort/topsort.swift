@@ -66,4 +66,24 @@ final class topsort_swiftTests: XCTestCase {
         XCTAssertEqual(fpv.wrappedValue, nil)
         XCTAssertFalse(FileManager.default.fileExists(atPath: path))
     }
+    
+    func testFilePersistedValueThreadSafety() {
+        let path = PathHelper.path(for: "test.plist")
+        var fpv = FilePersistedValue<Int>(storePath: path)
+        fpv.wrappedValue = 1
+        XCTAssertEqual(fpv.wrappedValue, 1)
+        fpv.wrappedValue = 2
+        sleep(1)
+        fpv = FilePersistedValue<Int>(storePath: path)
+        XCTAssertEqual(fpv.wrappedValue, 2)
+        fpv.wrappedValue = 3
+        sleep(1)
+        fpv = FilePersistedValue<Int>(storePath: path)
+        XCTAssertEqual(fpv.wrappedValue, 3)
+        fpv.wrappedValue = nil
+        sleep(1)
+        fpv = FilePersistedValue<Int>(storePath: path)
+        XCTAssertEqual(fpv.wrappedValue, nil)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: path))
+    }
 }
