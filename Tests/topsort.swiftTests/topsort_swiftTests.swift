@@ -67,23 +67,28 @@ final class topsort_swiftTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: path))
     }
     
-    func testFilePersistedValueThreadSafety() {
+    func testFilePersistedValueThreadSafety() async {
+        let queue = DispatchQueue(label: "com.topsort.EventOverwhelmer", qos: .background)
         let path = PathHelper.path(for: "test.plist")
-        var fpv = FilePersistedValue<Int>(storePath: path)
-        fpv.wrappedValue = 1
-        XCTAssertEqual(fpv.wrappedValue, 1)
-        fpv.wrappedValue = 2
-        sleep(1)
-        fpv = FilePersistedValue<Int>(storePath: path)
-        XCTAssertEqual(fpv.wrappedValue, 2)
-        fpv.wrappedValue = 3
-        sleep(1)
-        fpv = FilePersistedValue<Int>(storePath: path)
-        XCTAssertEqual(fpv.wrappedValue, 3)
-        fpv.wrappedValue = nil
-        sleep(1)
-        fpv = FilePersistedValue<Int>(storePath: path)
-        XCTAssertEqual(fpv.wrappedValue, nil)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: path))
+        let fpv = FilePersistedValue<[EventItem]>(storePath: path)
+
+        queue.async {
+            let event = Event(
+                entity: Entity(type: EntityType.product, id: "xpto"),
+                occurredAt: Date.now
+            )
+            while true {
+                if Int.random(in: 0...2) == 0 {
+                    fpv.wrappedValue = []
+                } else {
+                    fpv.wrappedValue?.append(.click(event))
+                }
+            }
+        }
+        
+        
+        //let sender: EventSender? = EventSender()
+        //sender?.start()
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
     }
 }
