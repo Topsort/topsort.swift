@@ -23,4 +23,17 @@ class MockHTTPClient: HTTPClient {
             return nil
         }
     }
+    
+    override func post(url _: URL, data: Data, callback: @escaping (Result<Data?, HTTPClientError>) -> Void) {
+        postCalled = true
+        postData = data
+        switch postResult {
+        case let .success(data):
+            callback(.success(data))
+        case let .failure(error):
+            callback(.failure(HTTPClientError.unknown(error: error, data: ErrorData(data: data))))
+        case .none:
+            callback(.failure(HTTPClientError.statusCode(code: 400, data: ErrorData(data: data))))
+        }
+    }
 }
