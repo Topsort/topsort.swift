@@ -42,17 +42,6 @@ class HTTPClient {
         self.apiKey = apiKey
         session = URLSession(configuration: .ephemeral, delegate: nil, delegateQueue: nil)
     }
-    
-    private func newRequest(url: URL, method: String) -> URLRequest {
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
-        request.httpMethod = method
-        request.addValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
-        request.addValue("analytics-swift/\(__analytics_version)", forHTTPHeaderField: "User-Agent")
-        if let apiKey = apiKey {
-            request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        }
-        return request
-    }
 
     public func asyncPost(url: URL, data: Data) async throws -> Data? {
         var request = newRequest(url: url, method: "POST")
@@ -65,6 +54,19 @@ class HTTPClient {
             throw HTTPClientError.statusCode(code: httpResponse.statusCode, data: ErrorData(data: data))
         }
         return data
+    }
+}
+
+extension HTTPClient {
+    private func newRequest(url: URL, method: String) -> URLRequest {
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
+        request.httpMethod = method
+        request.addValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+        request.addValue("analytics-swift/\(__analytics_version)", forHTTPHeaderField: "User-Agent")
+        if let apiKey = apiKey {
+            request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        return request
     }
 
     public func post(url: URL, data: Data, callback: @escaping (Result<Data?, HTTPClientError>) -> Void) {
