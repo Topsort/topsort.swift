@@ -85,10 +85,8 @@ final class topsort_swiftTests: XCTestCase {
                 }
             }
         }
-        
-        
-        //let sender: EventSender? = EventSender()
-        //sender?.start()
+
+        // This is as low as I could get to reproduce the error consistently
         try? await Task.sleep(nanoseconds: 1_000_000_000)
     }
 }
