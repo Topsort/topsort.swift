@@ -66,7 +66,7 @@ final class topsort_swiftTests: XCTestCase {
         XCTAssertEqual(fpv.wrappedValue, nil)
         XCTAssertFalse(FileManager.default.fileExists(atPath: path))
     }
-    
+
     func testFilePersistedValueThreadSafety() async {
         let queue = DispatchQueue(label: "com.topsort.EventOverwhelmer", qos: .background)
         let path = PathHelper.path(for: "test.plist")
@@ -78,7 +78,7 @@ final class topsort_swiftTests: XCTestCase {
                 occurredAt: Date.now
             )
             while true {
-                if Int.random(in: 0...2) == 0 {
+                if Int.random(in: 0 ... 2) == 0 {
                     fpv.wrappedValue = []
                 } else {
                     fpv.wrappedValue?.append(.click(event))
