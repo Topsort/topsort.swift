@@ -26,19 +26,18 @@ public class FilePersistedValue<T: Codable> {
         get { value }
         set {
             value = newValue
-            persist()
+            persist(value: newValue)
         }
     }
 
-    private func persist() {
+    private func persist(value: T?) {
         serialQueue.async {
             do {
                 let fileManager = FileManager.default
                 if fileManager.fileExists(atPath: self.storePath) {
                     try fileManager.removeItem(atPath: self.storePath)
                 }
-                guard let value = self.value
-                else { return }
+                guard value != nil else { return }
                 let data = try PropertyListEncoder().encode(PersistedValueWrapper(value: value))
                 let url = URL(fileURLWithPath: self.storePath)
                 try data.write(to: url)

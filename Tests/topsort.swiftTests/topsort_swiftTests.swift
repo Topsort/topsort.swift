@@ -66,4 +66,27 @@ final class topsort_swiftTests: XCTestCase {
         XCTAssertEqual(fpv.wrappedValue, nil)
         XCTAssertFalse(FileManager.default.fileExists(atPath: path))
     }
+
+    func testFilePersistedValueThreadSafety() async {
+        let queue = DispatchQueue(label: "com.topsort.EventOverwhelmer", qos: .background)
+        let path = PathHelper.path(for: "test.plist")
+        let fpv = FilePersistedValue<[EventItem]>(storePath: path)
+
+        queue.async {
+            let event = Event(
+                entity: Entity(type: EntityType.product, id: "xpto"),
+                occurredAt: Date.now
+            )
+            while true {
+                if Int.random(in: 0 ... 2) == 0 {
+                    fpv.wrappedValue = []
+                } else {
+                    fpv.wrappedValue?.append(.click(event))
+                }
+            }
+        }
+
+        // This is as low as I could get to reproduce the error consistently
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+    }
 }
