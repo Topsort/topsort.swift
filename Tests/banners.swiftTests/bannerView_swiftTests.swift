@@ -9,9 +9,9 @@ class TopsortBannerTests: XCTestCase {
         let banner = TopsortBanner(bannerAuctionBuilder: .init(
             slotId: "test_slot_id",
             deviceType: "test_device_type")
-        ).buttonClickedAction({ _ in
+        ).buttonClickedAction { _ in
             expectation.fulfill()
-        })
+        }
 
         banner.buttonClickedAction?(nil)
 
@@ -28,13 +28,13 @@ class TopsortBannerTests: XCTestCase {
         // Mock Topsort and response
         let mockTopsort = MockTopsort(executeAuctionsMockResponse: auctionResponse)
         Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
-        
+
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
             deviceType: "test_device_type").build()
-        
+
         let vm = await TopsortBanner.ViewModel()
-        
+
         await vm.executeAuctions(auction: auction, topsort: mockTopsort, onError: nil, onNoWinners: nil)
 
         await MainActor.run {

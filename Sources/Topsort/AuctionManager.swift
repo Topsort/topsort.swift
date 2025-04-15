@@ -41,15 +41,15 @@ class AuctionManager {
             print("failed to serialize auctions: \(auctions)")
             throw AuctionError.serializationError
         }
-        
-        let result: Result<Data?, HTTPClientError>;
+
+        let result: Result<Data?, HTTPClientError>
         do {
             let data = try await client.asyncPost(url: url, data: auctionsData, timeoutInterval: timeoutInterval)
             result = .success(data)
         } catch {
             result = .failure(error)
         }
-        
+
         return try process_response(result: result)
     }
 
