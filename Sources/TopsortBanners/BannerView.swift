@@ -34,7 +34,7 @@ extension BannerAuctionBuilder: With {
     public func with(searchQuery value: String?) -> Self {
         return with(path: \.searchQuery, to: value)
     }
-    public func with(geoTargetting value: AuctionGeoTargeting?) -> Self {
+    public func with(geoTargeting value: AuctionGeoTargeting?) -> Self {
         return with(path: \.geoTargeting, to: value)
     }
 }
