@@ -4,22 +4,16 @@ import XCTest
 
 class TopsortBannerTests: XCTestCase {
     func testTopsortBannerInitialization() {
+        Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
         let expectation = self.expectation(description: "Button clicked action")
-        let banner = TopsortBanner(
-            apiKey: "test_api_key",
-            url: "test_url",
-            width: 300,
-            height: 250,
+        let banner = TopsortBanner(bannerAuctionBuilder: .init(
             slotId: "test_slot_id",
-            deviceType: "test_device_type"
-        ) { _ in
+            deviceType: "test_device_type")
+        ).buttonClickedAction({ _ in
             expectation.fulfill()
-        }
+        })
 
-        XCTAssertEqual(banner.width, 300)
-        XCTAssertEqual(banner.height, 250)
-
-        banner.buttonClickedAction(nil)
+        banner.buttonClickedAction?(nil)
 
         wait(for: [expectation], timeout: 1.0)
     }
@@ -32,28 +26,21 @@ class TopsortBannerTests: XCTestCase {
         let auctionResponse = AuctionResponse(results: [auctionResult])
 
         // Mock Topsort and response
-        let mockTopsort = MockTopsort()
-        mockTopsort.executeAuctionsMockResponse = auctionResponse
-
-        let banner = await TopsortBanner(
-            apiKey: "test_api_key",
-            url: "test_url",
-            width: 300,
-            height: 250,
+        let mockTopsort = MockTopsort(executeAuctionsMockResponse: auctionResponse)
+        Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
+        
+        let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
-            deviceType: "test_device_type",
-            buttonClickedAction: { _ in
-            },
-            topsort: mockTopsort
-        )
-
-        // Execute the method
-        await banner.executeAuctions(deviceType: "test_device_type", slotId: "test_slot_id")
+            deviceType: "test_device_type").build()
+        
+        let vm = await TopsortBanner.ViewModel()
+        
+        await vm.executeAuctions(auction: auction, topsort: mockTopsort, onError: nil, onNoWinners: nil)
 
         await MainActor.run {
-            XCTAssertEqual(banner.sharedValues.resolvedBidId, "resolved_bid_id")
-            XCTAssertEqual(banner.sharedValues.urlString, "https://example.com")
-            XCTAssertFalse(banner.sharedValues.loading)
+            XCTAssertEqual(vm.resolvedBidId, "resolved_bid_id")
+            XCTAssertEqual(vm.urlString, "https://example.com")
+            XCTAssertFalse(vm.loading)
         }
     }
 }

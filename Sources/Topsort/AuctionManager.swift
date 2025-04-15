@@ -1,8 +1,16 @@
 import Foundation
 
 private let AUCTIONS_TOPSORT_URL = URL(string: "https://api.topsort.com/v2/auctions")!
-private let MIN_AUCTIONS = 0
+private let MIN_AUCTIONS = 1
 private let MAX_AUCTIONS = 5
+
+public enum AuctionError: Error {
+    case http(error: HTTPClientError)
+    case invalidNumberAuctions(count: Int)
+    case serializationError
+    case deserializationError(error: Error, data: Data)
+    case emptyResponse
+}
 
 class AuctionManager {
     public static let shared = AuctionManager()
@@ -12,6 +20,7 @@ class AuctionManager {
 
     var url: URL = AUCTIONS_TOPSORT_URL
     var client: HTTPClient
+    public var timeoutInterval: TimeInterval = 60
 
     public func configure(apiKey: String, url: String?) {
         client.apiKey = apiKey
@@ -23,41 +32,45 @@ class AuctionManager {
         }
     }
 
-    public func executeAuctions(auctions: [Auction]) async -> AuctionResponse? {
-        if auctions.count > MAX_AUCTIONS || auctions.count == 0 {
+    public func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
+        if auctions.count > MAX_AUCTIONS || auctions.count < MIN_AUCTIONS {
             print("Invalid number of auctions: \(auctions.count), must be between \(MIN_AUCTIONS) and \(MAX_AUCTIONS)")
-            return nil
+            throw AuctionError.invalidNumberAuctions(count: auctions.count)
         }
-        var response: AuctionResponse?
         guard let auctionsData = try? JSONEncoder().encode(["auctions": auctions]) else {
             print("failed to serialize auctions: \(auctions)")
-            return nil
+            throw AuctionError.serializationError
         }
-
+        
+        let result: Result<Data?, HTTPClientError>;
         do {
-            let resultData = try await client.asyncPost(url: url, data: auctionsData)
-            response = try process_response(result: .success(resultData))
+            let data = try await client.asyncPost(url: url, data: auctionsData, timeoutInterval: timeoutInterval)
+            result = .success(data)
         } catch {
-            print("Error posting auctions: \(error)")
+            result = .failure(error)
         }
-        return response
+        
+        return try process_response(result: result)
     }
 
-    private func process_response(result: Result<Data?, HTTPClientError>) throws -> AuctionResponse? {
+    private func process_response(result: Result<Data?, HTTPClientError>) throws(AuctionError) -> AuctionResponse {
         switch result {
         case let .success(data):
-            if data == nil {
-                throw HTTPClientError.unknown(error: NSError(domain: "HTTPClient", code: 0, userInfo: nil), data: ErrorData(data: data))
+            guard let data = data else {
+                throw .emptyResponse
             }
-            let resultData = decodeAuctionResponse(data: data!)
-            return resultData
+            return try decodeAuctionResponse(data: data)
         case let .failure(error):
             print("failed to send auctions: \(error)")
-            return nil
+            throw .http(error: error)
         }
     }
 
-    private func decodeAuctionResponse(data: Data) -> AuctionResponse? {
-        return try? JSONDecoder().decode(AuctionResponse.self, from: data)
+    private func decodeAuctionResponse(data: Data) throws(AuctionError) -> AuctionResponse {
+        do {
+            return try JSONDecoder().decode(AuctionResponse.self, from: data)
+        } catch {
+            throw .deserializationError(error: error, data: data)
+        }
     }
 }

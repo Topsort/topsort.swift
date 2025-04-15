@@ -2,7 +2,7 @@ import Foundation
 
 // Auctions requests models
 
-public struct AuctionGeoTargeting: Codable {
+public struct AuctionGeoTargeting: Codable, Equatable {
     /**
      * The location this auction is being run for.
      */
@@ -13,7 +13,7 @@ public struct AuctionGeoTargeting: Codable {
     }
 }
 
-public struct AuctionCategory: Codable {
+public struct AuctionCategory: Codable, Equatable {
     /**
      * The category ID of the bids that will participate in an auction.
      */
@@ -38,7 +38,7 @@ public struct AuctionCategory: Codable {
     }
 }
 
-public struct AuctionProducts: Codable {
+public struct AuctionProducts: Codable, Equatable {
     /**
      * The list of product IDs to be considered in the auction.
      */
@@ -58,7 +58,7 @@ public struct AuctionProducts: Codable {
     }
 }
 
-public struct Auction: Codable {
+public struct Auction: Codable, Equatable {
     /**
      * Discriminator for the type of auction.
      * Could be one of the following values:

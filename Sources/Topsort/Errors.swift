@@ -1,11 +1,11 @@
 import Foundation
 
-struct TopsortError: Error, Decodable {
+public struct TopsortError: Error, Decodable {
     let message: String
     let errCode: TopsortErrorCode
 }
 
-enum TopsortErrorCode: Decodable {
+public enum TopsortErrorCode: Decodable {
     case badRequest
     case emptyRequest
     case internalServerError

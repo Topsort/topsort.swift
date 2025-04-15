@@ -3,12 +3,12 @@ import Foundation
     import FoundationNetworking
 #endif
 
-enum HTTPClientError: Error {
+public enum HTTPClientError: Error {
     case unknown(error: Error, data: ErrorData?)
     case statusCode(code: Int, data: ErrorData?)
 }
 
-enum ErrorData {
+public enum ErrorData {
     case data(Data)
     case topsortError(TopsortError)
 }
@@ -43,10 +43,16 @@ class HTTPClient {
         session = URLSession(configuration: .ephemeral, delegate: nil, delegateQueue: nil)
     }
 
-    public func asyncPost(url: URL, data: Data) async throws -> Data? {
+    public func asyncPost(url: URL, data: Data, timeoutInterval: TimeInterval = 60) async throws(HTTPClientError) -> Data? {
         var request = newRequest(url: url, method: "POST")
         request.httpBody = data
-        let (data, response) = try await session.data(for: request)
+        request.timeoutInterval = timeoutInterval
+        let (data, response): (Data?, URLResponse);
+        do {
+            (data, response) = try await session.data(for: request);
+        } catch {
+            throw HTTPClientError.unknown(error: error, data: nil)
+        }
         guard let httpResponse = response as? HTTPURLResponse else {
             throw HTTPClientError.unknown(error: NSError(domain: "HTTPClient", code: 0, userInfo: nil), data: ErrorData(data: data))
         }

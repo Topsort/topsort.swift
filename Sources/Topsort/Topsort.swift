@@ -3,11 +3,11 @@ import Foundation
 public protocol TopsortProtocol {
     var opaqueUserId: String { get }
     func set(opaqueUserId: String?)
-    func configure(apiKey: String, url: String?)
+    func configure(apiKey: String, url: String?, auctionsTimeout: TimeInterval?)
     func track(impression event: Event)
     func track(click event: Event)
     func track(purchase event: PurchaseEvent)
-    func executeAuctions(auctions: [Auction]) async -> AuctionResponse?
+    func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse
 }
 
 public class Topsort: TopsortProtocol {
@@ -29,9 +29,12 @@ public class Topsort: TopsortProtocol {
         _opaqueUserId = opaqueUserId ?? Self.newOpaqueUserId()
     }
 
-    public func configure(apiKey: String, url: String? = nil) {
+    public func configure(apiKey: String, url: String? = nil, auctionsTimeout: TimeInterval? = nil) {
         EventManager.shared.configure(apiKey: apiKey, url: url)
         AuctionManager.shared.configure(apiKey: apiKey, url: url)
+        if let timeout = auctionsTimeout {
+            AuctionManager.shared.timeoutInterval = timeout
+        }
     }
 
     public func track(impression event: Event) {
@@ -48,7 +51,7 @@ public class Topsort: TopsortProtocol {
 
     private static func newOpaqueUserId() -> String { UUID().uuidString }
 
-    public func executeAuctions(auctions: [Auction]) async -> AuctionResponse? {
-        return await AuctionManager.shared.executeAuctions(auctions: auctions)
+    public func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
+        return try await AuctionManager.shared.executeAuctions(auctions: auctions)
     }
 }

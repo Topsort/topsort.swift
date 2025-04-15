@@ -11,7 +11,7 @@ class MockHTTPClient: HTTPClient {
         super.init(apiKey: apiKey)
     }
 
-    override func asyncPost(url _: URL, data: Data) async throws -> Data? {
+    override func asyncPost(url: URL, data: Data, timeoutInterval: TimeInterval = 60) async throws(HTTPClientError) -> Data? {
         postCalled = true
         postData = data
         switch postResult {
