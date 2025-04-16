@@ -47,9 +47,9 @@ class HTTPClient {
         var request = newRequest(url: url, method: "POST")
         request.httpBody = data
         request.timeoutInterval = timeoutInterval
-        let (data, response): (Data?, URLResponse);
+        let (data, response): (Data?, URLResponse)
         do {
-            (data, response) = try await session.data(for: request);
+            (data, response) = try await session.data(for: request)
         } catch {
             throw HTTPClientError.unknown(error: error, data: nil)
         }
