@@ -8,7 +8,8 @@ class TopsortBannerTests: XCTestCase {
         let expectation = self.expectation(description: "Button clicked action")
         let banner = TopsortBanner(bannerAuctionBuilder: .init(
             slotId: "test_slot_id",
-            deviceType: "test_device_type")
+            deviceType: "test_device_type"
+        )
         ).buttonClickedAction { _ in
             expectation.fulfill()
         }
@@ -31,7 +32,8 @@ class TopsortBannerTests: XCTestCase {
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
-            deviceType: "test_device_type").build()
+            deviceType: "test_device_type"
+        ).build()
 
         let vm = await TopsortBanner.ViewModel()
 
