@@ -10,5 +10,5 @@ jobs:
     name: Validate Swift formatting
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: swiftformat --lint --reporter github-actions-log .

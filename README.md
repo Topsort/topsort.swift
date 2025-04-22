@@ -25,7 +25,7 @@ import Topsort
 @main
 struct MyApp: App {
     init() {
-        Topsort.shared.configure(apiKey: "your-api-key", url: "https://api.topsort.com")
+        Topsort.shared.configure(apiKey: "your-api-key", auctionsTimeout: 20)
     }
     var body: some Scene {
         WindowGroup {
@@ -125,16 +125,22 @@ import TopsortBanners
 
 struct ContentView: View {
     var body: some View {
-        TopsortBanner(
-            apiKey: "API_KEY",
-            url: "https://api.topsort.com/v2",
-            width: width,
-            height: height,
-            slotId: "slotId",
-            deviceType: "device"
-        ) { response in
-            // function to execute when banner is clicked
-        }
+        TopsortBanner(bannerAuctionBuilder: .init(slotId: "slotId", deviceType: "device"))
+            .contentMode(.fill)
+            .onNoWinners({
+                // callback when no winners are returned
+            })
+            .onError({ error in
+                // callback when an error occurs
+            })
+            .onImageLoad({
+                // callback when image is loaded
+            })
+            .buttonClickedAction({ response in
+                // callback when button is clicked
+            })
+            .frame(maxHeight: 50)
+            .clipped()
     }
 }
 ```

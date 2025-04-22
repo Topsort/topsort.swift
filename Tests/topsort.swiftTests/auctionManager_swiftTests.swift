@@ -57,7 +57,7 @@ class AuctionManagerTests: XCTestCase {
         )
         mockClient.postResult = .success(responseData)
 
-        let response = await auctionManager.executeAuctions(auctions: auctions)
+        let response = try! await auctionManager.executeAuctions(auctions: auctions)
 
         XCTAssertTrue(mockClient.postCalled)
         XCTAssertNotNil(response)
@@ -66,7 +66,7 @@ class AuctionManagerTests: XCTestCase {
     func testExecuteAuctionsWithTooManyAuctions() async {
         let auctions = Array(repeating: Auction(type: "mobile", slots: 1), count: 6)
 
-        let response = await auctionManager.executeAuctions(auctions: auctions)
+        let response = try? await auctionManager.executeAuctions(auctions: auctions)
 
         XCTAssertFalse(mockClient.postCalled)
         XCTAssertNil(response)
@@ -87,7 +87,7 @@ class AuctionManagerTests: XCTestCase {
         )
         mockClient.postResult = .success(responseData)
 
-        let response = await auctionManager.executeAuctions(auctions: auctions)
+        let response = try? await auctionManager.executeAuctions(auctions: auctions)
 
         XCTAssertTrue(mockClient.postCalled)
         XCTAssertNil(response)
@@ -97,7 +97,7 @@ class AuctionManagerTests: XCTestCase {
         let auctions = [Auction(type: "mobile", slots: 1)]
         mockClient.postResult = .failure(.unknown(error: NSError(domain: "Test", code: 1, userInfo: nil), data: nil))
 
-        let response = await auctionManager.executeAuctions(auctions: auctions)
+        let response = try? await auctionManager.executeAuctions(auctions: auctions)
 
         XCTAssertTrue(mockClient.postCalled)
         XCTAssertNil(response)
