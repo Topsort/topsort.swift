@@ -49,6 +49,7 @@ public typealias OnError = Action<BannerError>
 
 public struct TopsortBanner: View {
     @StateObject var viewModel = ViewModel()
+    @State var imageUrl: URL? = nil
 
     var buttonClickedAction: ButtonClicked? = nil
     var onImageLoad: UnitAction? = nil
@@ -79,25 +80,33 @@ public struct TopsortBanner: View {
             if viewModel.loading {
                 ProgressView()
             } else {
-                if let url = viewModel.urlString {
-                    AsyncImage(url: URL(string: url)) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                        case let .success(image):
-                            let _ = self.onImageLoad?()
-                            GeometryReader { geo in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: self.contentMode)
-                                    .frame(maxWidth: geo.size.width, maxHeight: geo.size.height)
-                                    .clipped()
+                if let image_url = self.viewModel.urlString {
+                    if let url = URL(string: image_url) {
+                        AsyncImage(url: self.imageUrl) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                            case let .success(image):
+                                let _ = self.onImageLoad?()
+                                GeometryReader { geo in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: self.contentMode)
+                                        .frame(maxWidth: geo.size.width, maxHeight: geo.size.height)
+                                        .clipped()
+                                }
+                            case let .failure(error):
+                                let _ = self.onError?(.unknown(error: error))
+                                EmptyView()
+                            @unknown default:
+                                EmptyView()
                             }
-                        case let .failure(error):
-                            let _ = self.onError?(.unknown(error: error))
-                            EmptyView()
-                        @unknown default:
-                            EmptyView()
+                        }
+                        .onAppear {
+                            self.imageUrl = url
+                        }
+                        .onDisappear {
+                            self.imageUrl = nil
                         }
                     }
                 }
