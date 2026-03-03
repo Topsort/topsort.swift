@@ -1,5 +1,5 @@
 # Source code
-*.swift @Topsort/integrations
+**/*.swift @Topsort/integrations
 
 # CI
 .github/ @Topsort/integrations
