@@ -46,7 +46,7 @@ private let MAX_IN_PROGRESS = 10
 private let MAX_RETRIES = 50
 
 class EventManager {
-    public static let shared = EventManager()
+    static let shared = EventManager()
     private let serialQueue = DispatchQueue(label: "com.topsort.analytics.EventManager")
     private let periodicEvent = PeriodicEvent(interval: 60, action: { EventManager.shared.handlePeriodicEvent() })
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.event-queue.plist"))
@@ -89,7 +89,7 @@ class EventManager {
 
     private var url: URL = EVENTS_TOPSORT_URL
     private var client: HTTPClient
-    public func configure(apiKey: String, url: String?) {
+    func configure(apiKey: String, url: String?) {
         client.apiKey = apiKey
         if let url = url {
             guard let url = URL(string: "\(url)/events") else {
@@ -99,7 +99,7 @@ class EventManager {
         }
     }
 
-    public func push(event: EventItem) {
+    func push(event: EventItem) {
         serialQueue.async {
             self.eventQueue.append(event)
             self.send()

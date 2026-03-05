@@ -2,7 +2,7 @@
 import XCTest
 
 final class topsort_swiftTests: XCTestCase {
-    func testExample() throws {
+    func testExample() {
         // XCTest Documentation
         // https://developer.apple.com/documentation/xctest
 
@@ -20,15 +20,15 @@ final class topsort_swiftTests: XCTestCase {
 
         let myEvent = Event(entity: Entity(type: EntityType.product, id: "product-id"), occurredAt: date)
 
-        let jsonData = try! JSONEncoder().encode(myEvent)
-        let decoded = try! JSONSerialization.jsonObject(with: jsonData, options: []) as! [String: Any]
+        let jsonData = try JSONEncoder().encode(myEvent)
+        let decoded = try XCTUnwrap(try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any])
 
-        XCTAssertEqual(decoded["opaqueUserId"] as! String, "user-id")
-        XCTAssertEqual((decoded["entity"] as! [String: Any])["type"] as! String, "product")
-        XCTAssertEqual(decoded["occurredAt"] as! String, occurredAt)
+        XCTAssertEqual(decoded["opaqueUserId"] as? String, "user-id")
+        XCTAssertEqual((decoded["entity"] as? [String: Any])?["type"] as? String, "product")
+        XCTAssertEqual(decoded["occurredAt"] as? String, occurredAt)
     }
 
-    func testPeriodicEvent() throws {
+    func testPeriodicEvent() {
         let q = DispatchQueue(label: "test")
         var cnt = 0
         var completed = false

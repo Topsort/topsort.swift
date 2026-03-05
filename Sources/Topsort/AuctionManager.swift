@@ -13,16 +13,16 @@ public enum AuctionError: Error {
 }
 
 class AuctionManager {
-    public static let shared = AuctionManager()
+    static let shared = AuctionManager()
     private init() {
         client = HTTPClient(apiKey: nil)
     }
 
     var url: URL = AUCTIONS_TOPSORT_URL
     var client: HTTPClient
-    public var timeoutInterval: TimeInterval = 60
+    var timeoutInterval: TimeInterval = 60
 
-    public func configure(apiKey: String, url: String?) {
+    func configure(apiKey: String, url: String?) {
         client.apiKey = apiKey
         if let url = url {
             guard let url = URL(string: "\(url)/auctions") else {
@@ -32,7 +32,7 @@ class AuctionManager {
         }
     }
 
-    public func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
+    func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
         if auctions.count > MAX_AUCTIONS || auctions.count < MIN_AUCTIONS {
             print("Invalid number of auctions: \(auctions.count), must be between \(MIN_AUCTIONS) and \(MAX_AUCTIONS)")
             throw AuctionError.invalidNumberAuctions(count: auctions.count)

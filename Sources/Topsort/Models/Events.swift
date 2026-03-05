@@ -1,4 +1,4 @@
-/**
+/*
  Topsort Events API models based on our public API: https://docs.topsort.com/reference/reportevents-2
  */
 
