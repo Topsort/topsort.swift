@@ -2,6 +2,51 @@ import Foundation
 import SwiftUI
 import Topsort
 
+private let imageSession = URLSession(configuration: .ephemeral)
+
+struct RemoteImage: View {
+    let url: URL
+    let contentMode: ContentMode
+    var onSuccess: (() -> Void)?
+    var onFailure: ((Error) -> Void)?
+
+    @State private var uiImage: UIImage?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let uiImage {
+                GeometryReader { geo in
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: contentMode)
+                        .frame(maxWidth: geo.size.width, maxHeight: geo.size.height)
+                        .clipped()
+                }
+            } else if failed {
+                EmptyView()
+            } else {
+                ProgressView()
+            }
+        }
+        .task(id: url) {
+            do {
+                let (data, _) = try await imageSession.data(from: url)
+                guard let image = UIImage(data: data) else {
+                    failed = true
+                    onFailure?(NSError(domain: "RemoteImage", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"]))
+                    return
+                }
+                uiImage = image
+                onSuccess?()
+            } catch {
+                failed = true
+                onFailure?(error)
+            }
+        }
+    }
+}
+
 public enum BannerError: Error {
     case auction(error: AuctionError)
     case unknown(error: Error)
@@ -49,7 +94,6 @@ public typealias OnError = Action<BannerError>
 
 public struct TopsortBanner: View {
     @StateObject var viewModel = ViewModel()
-    @State var imageUrl: URL? = nil
 
     var buttonClickedAction: ButtonClicked? = nil
     var onImageLoad: UnitAction? = nil
@@ -82,32 +126,12 @@ public struct TopsortBanner: View {
             } else {
                 if let image_url = self.viewModel.urlString {
                     if let url = URL(string: image_url) {
-                        AsyncImage(url: self.imageUrl) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView()
-                            case let .success(image):
-                                let _ = self.onImageLoad?()
-                                GeometryReader { geo in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: self.contentMode)
-                                        .frame(maxWidth: geo.size.width, maxHeight: geo.size.height)
-                                        .clipped()
-                                }
-                            case let .failure(error):
-                                let _ = self.onError?(.unknown(error: error))
-                                EmptyView()
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                        .onAppear {
-                            self.imageUrl = url
-                        }
-                        .onDisappear {
-                            self.imageUrl = nil
-                        }
+                        RemoteImage(
+                            url: url,
+                            contentMode: self.contentMode,
+                            onSuccess: { self.onImageLoad?() },
+                            onFailure: { error in self.onError?(.unknown(error: error)) }
+                        )
                     }
                 }
             }
