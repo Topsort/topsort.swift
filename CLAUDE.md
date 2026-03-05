@@ -85,6 +85,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 
 ## Code Style
 
+- **Always run `swiftformat .` before opening a PR** to avoid CI failures
 - **swiftformat** enforced in CI (default rules, no `.swiftformat` config file)
 - Source files: PascalCase (`EventManager.swift`, `BannerView.swift`)
 - Test targets: lowercase with dots (`topsort.swiftTests`, `banners.swiftTests`)
