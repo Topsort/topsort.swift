@@ -36,14 +36,14 @@ extension HTTPClientError {
 }
 
 class HTTPClient {
-    public var apiKey: String?
+    var apiKey: String?
     private let session: URLSession
-    public init(apiKey: String?) {
+    init(apiKey: String?) {
         self.apiKey = apiKey
         session = URLSession(configuration: .ephemeral, delegate: nil, delegateQueue: nil)
     }
 
-    public func asyncPost(url: URL, data: Data, timeoutInterval: TimeInterval = 60) async throws(HTTPClientError) -> Data? {
+    func asyncPost(url: URL, data: Data, timeoutInterval: TimeInterval = 60) async throws(HTTPClientError) -> Data? {
         var request = newRequest(url: url, method: "POST")
         request.httpBody = data
         request.timeoutInterval = timeoutInterval
@@ -75,7 +75,7 @@ extension HTTPClient {
         return request
     }
 
-    public func post(url: URL, data: Data, callback: @escaping (Result<Data?, HTTPClientError>) -> Void) {
+    func post(url: URL, data: Data, callback: @escaping (Result<Data?, HTTPClientError>) -> Void) {
         var request = newRequest(url: url, method: "POST")
         request.httpBody = data
         let task = session.dataTask(with: request) { data, response, error in
