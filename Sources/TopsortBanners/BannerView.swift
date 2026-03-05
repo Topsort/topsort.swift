@@ -2,6 +2,12 @@ import Foundation
 import SwiftUI
 import Topsort
 
+#if canImport(UIKit)
+    import UIKit
+#elseif canImport(AppKit)
+    import AppKit
+#endif
+
 private let imageSession = URLSession(configuration: .ephemeral)
 
 struct RemoteImage: View {
@@ -10,14 +16,14 @@ struct RemoteImage: View {
     var onSuccess: (() -> Void)?
     var onFailure: ((Error) -> Void)?
 
-    @State private var uiImage: UIImage?
+    @State private var image: Image?
     @State private var failed = false
 
     var body: some View {
         Group {
-            if let uiImage {
+            if let image {
                 GeometryReader { geo in
-                    Image(uiImage: uiImage)
+                    image
                         .resizable()
                         .aspectRatio(contentMode: contentMode)
                         .frame(maxWidth: geo.size.width, maxHeight: geo.size.height)
@@ -32,18 +38,30 @@ struct RemoteImage: View {
         .task(id: url) {
             do {
                 let (data, _) = try await imageSession.data(from: url)
-                guard let image = UIImage(data: data) else {
+                guard let swiftUIImage = Self.makeImage(from: data) else {
                     failed = true
                     onFailure?(NSError(domain: "RemoteImage", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"]))
                     return
                 }
-                uiImage = image
+                image = swiftUIImage
                 onSuccess?()
             } catch {
                 failed = true
                 onFailure?(error)
             }
         }
+    }
+
+    private static func makeImage(from data: Data) -> Image? {
+        #if canImport(UIKit)
+            guard let uiImage = UIImage(data: data) else { return nil }
+            return Image(uiImage: uiImage)
+        #elseif canImport(AppKit)
+            guard let nsImage = NSImage(data: data) else { return nil }
+            return Image(nsImage: nsImage)
+        #else
+            return nil
+        #endif
     }
 }
 
@@ -95,10 +113,10 @@ public typealias OnError = Action<BannerError>
 public struct TopsortBanner: View {
     @StateObject var viewModel = ViewModel()
 
-    var buttonClickedAction: ButtonClicked? = nil
-    var onImageLoad: UnitAction? = nil
-    var onError: OnError? = nil
-    var onNoWinners: UnitAction? = nil
+    var buttonClickedAction: ButtonClicked?
+    var onImageLoad: UnitAction?
+    var onError: OnError?
+    var onNoWinners: UnitAction?
     let auction: Auction
     var contentMode: ContentMode = .fill
     let topsort: TopsortProtocol
