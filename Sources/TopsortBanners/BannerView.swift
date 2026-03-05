@@ -2,6 +2,69 @@ import Foundation
 import SwiftUI
 import Topsort
 
+#if canImport(UIKit)
+    import UIKit
+#elseif canImport(AppKit)
+    import AppKit
+#endif
+
+private let imageSession = URLSession(configuration: .ephemeral)
+
+struct RemoteImage: View {
+    let url: URL
+    let contentMode: ContentMode
+    var onSuccess: (() -> Void)?
+    var onFailure: ((Error) -> Void)?
+
+    @State private var image: Image?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let image {
+                GeometryReader { geo in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: contentMode)
+                        .frame(maxWidth: geo.size.width, maxHeight: geo.size.height)
+                        .clipped()
+                }
+            } else if failed {
+                EmptyView()
+            } else {
+                ProgressView()
+            }
+        }
+        .task(id: url) {
+            do {
+                let (data, _) = try await imageSession.data(from: url)
+                guard let swiftUIImage = Self.makeImage(from: data) else {
+                    failed = true
+                    onFailure?(NSError(domain: "RemoteImage", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"]))
+                    return
+                }
+                image = swiftUIImage
+                onSuccess?()
+            } catch {
+                failed = true
+                onFailure?(error)
+            }
+        }
+    }
+
+    private static func makeImage(from data: Data) -> Image? {
+        #if canImport(UIKit)
+            guard let uiImage = UIImage(data: data) else { return nil }
+            return Image(uiImage: uiImage)
+        #elseif canImport(AppKit)
+            guard let nsImage = NSImage(data: data) else { return nil }
+            return Image(nsImage: nsImage)
+        #else
+            return nil
+        #endif
+    }
+}
+
 public enum BannerError: Error {
     case auction(error: AuctionError)
     case unknown(error: Error)
@@ -49,12 +112,11 @@ public typealias OnError = Action<BannerError>
 
 public struct TopsortBanner: View {
     @StateObject var viewModel = ViewModel()
-    @State var imageUrl: URL? = nil
 
-    var buttonClickedAction: ButtonClicked? = nil
-    var onImageLoad: UnitAction? = nil
-    var onError: OnError? = nil
-    var onNoWinners: UnitAction? = nil
+    var buttonClickedAction: ButtonClicked?
+    var onImageLoad: UnitAction?
+    var onError: OnError?
+    var onNoWinners: UnitAction?
     let auction: Auction
     var contentMode: ContentMode = .fill
     let topsort: TopsortProtocol
@@ -82,32 +144,12 @@ public struct TopsortBanner: View {
             } else {
                 if let image_url = self.viewModel.urlString {
                     if let url = URL(string: image_url) {
-                        AsyncImage(url: self.imageUrl) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView()
-                            case let .success(image):
-                                let _ = self.onImageLoad?()
-                                GeometryReader { geo in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: self.contentMode)
-                                        .frame(maxWidth: geo.size.width, maxHeight: geo.size.height)
-                                        .clipped()
-                                }
-                            case let .failure(error):
-                                let _ = self.onError?(.unknown(error: error))
-                                EmptyView()
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                        .onAppear {
-                            self.imageUrl = url
-                        }
-                        .onDisappear {
-                            self.imageUrl = nil
-                        }
+                        RemoteImage(
+                            url: url,
+                            contentMode: self.contentMode,
+                            onSuccess: { self.onImageLoad?() },
+                            onFailure: { error in self.onError?(.unknown(error: error)) }
+                        )
                     }
                 }
             }
