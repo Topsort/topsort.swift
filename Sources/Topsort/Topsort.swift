@@ -49,7 +49,9 @@ public class Topsort: TopsortProtocol {
         EventManager.shared.push(event: .purchase(event))
     }
 
-    private static func newOpaqueUserId() -> String { UUID().uuidString }
+    private static func newOpaqueUserId() -> String {
+        UUID().uuidString
+    }
 
     public func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
         return try await AuctionManager.shared.executeAuctions(auctions: auctions)

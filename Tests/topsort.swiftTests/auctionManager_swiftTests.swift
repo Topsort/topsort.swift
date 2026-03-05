@@ -28,7 +28,7 @@ class AuctionManagerTests: XCTestCase {
         XCTAssertEqual(auctionManager.url.absoluteString, "\(urlString)/auctions")
     }
 
-    func testExecuteAuctionsWithValidAuctions() async {
+    func testExecuteAuctionsWithValidAuctions() async throws {
         let auctions = [Auction(type: "mobile", slots: 1), Auction(type: "mobile", slots: 1)]
         let responseData = Data(
             """
@@ -57,7 +57,7 @@ class AuctionManagerTests: XCTestCase {
         )
         mockClient.postResult = .success(responseData)
 
-        let response = try! await auctionManager.executeAuctions(auctions: auctions)
+        let response = try await auctionManager.executeAuctions(auctions: auctions)
 
         XCTAssertTrue(mockClient.postCalled)
         XCTAssertNotNil(response)

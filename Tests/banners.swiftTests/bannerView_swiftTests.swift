@@ -9,8 +9,7 @@ class TopsortBannerTests: XCTestCase {
         let banner = TopsortBanner(bannerAuctionBuilder: .init(
             slotId: "test_slot_id",
             deviceType: "test_device_type"
-        )
-        ).buttonClickedAction { _ in
+        )).buttonClickedAction { _ in
             expectation.fulfill()
         }
 
