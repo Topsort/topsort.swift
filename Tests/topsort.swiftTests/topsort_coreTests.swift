@@ -14,7 +14,7 @@ class TopsortCoreTests: XCTestCase {
     }
 
     override func tearDown() {
-        // Restore default timeout to avoid leaking into other tests
+        Topsort.shared.isConfigured = true
         AuctionManager.shared.timeoutInterval = 60
         mockClient = nil
         super.tearDown()
@@ -64,9 +64,6 @@ class TopsortCoreTests: XCTestCase {
 
         // Events should have been dropped — mock client should NOT be called
         XCTAssertFalse(mockClient.postCalled, "Events should be dropped when not configured")
-
-        // Restore configured state
-        Topsort.shared.isConfigured = true
     }
 
     func testExecuteAuctionsThrowsWhenNotConfigured() async {
@@ -80,9 +77,6 @@ class TopsortCoreTests: XCTestCase {
                 XCTFail("Expected .notConfigured, got \(error)")
             }
         }
-
-        // Restore
-        Topsort.shared.isConfigured = true
     }
 
     // MARK: - Configure
