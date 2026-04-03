@@ -39,7 +39,7 @@ public class FilePersistedValue<T: Codable> {
     }
 
     func persistIfDirty() {
-        serialQueue.async {
+        serialQueue.sync {
             guard self.isDirty else { return }
             self.debouncedPersistWorkItem?.cancel()
             self.isDirty = false
