@@ -84,6 +84,7 @@ class EventManager {
     private var inProgress: Set<UUID> = []
     var flushAt: Int = 30
     var flushInterval: TimeInterval = 30
+    private var lifecycleObserver: LifecycleObserver?
 
     private init() {
         client = HTTPClient(apiKey: nil)
@@ -91,6 +92,16 @@ class EventManager {
         __pendingEvents.deferPersistence = true
         periodicEvent = PeriodicEvent(interval: 30, action: { EventManager.shared.handlePeriodicEvent() })
         periodicEvent.start()
+        lifecycleObserver = LifecycleObserver(
+            onBackground: { [weak self] in
+                Logger.debug("App entering background — flushing events")
+                self?.flush()
+            },
+            onTerminate: { [weak self] in
+                Logger.debug("App terminating — flushing and persisting events")
+                self?.flushAndPersist()
+            }
+        )
     }
 
     var url: URL = EVENTS_TOPSORT_URL
