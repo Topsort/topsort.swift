@@ -40,6 +40,6 @@ public class MockTopsort: TopsortProtocol {
     }
 
     public func executeAuctions(auctions _: [Auction]) async throws(AuctionError) -> AuctionResponse {
-        return executeAuctionsMockResponse
+        executeAuctionsMockResponse
     }
 }
