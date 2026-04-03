@@ -23,9 +23,9 @@ public class FilePersistedValue<T: Codable> {
     }
 
     public var wrappedValue: T? {
-        get { value }
+        get { serialQueue.sync { value } }
         set {
-            value = newValue
+            serialQueue.sync { value = newValue }
             persist(value: newValue)
         }
     }

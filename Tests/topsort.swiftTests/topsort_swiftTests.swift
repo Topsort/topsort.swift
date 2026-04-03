@@ -68,25 +68,40 @@ final class topsort_swiftTests: XCTestCase {
     }
 
     func testFilePersistedValueThreadSafety() async {
-        let queue = DispatchQueue(label: "com.topsort.EventOverwhelmer", qos: .background)
-        let path = PathHelper.path(for: "test.plist")
+        let path = PathHelper.path(for: "test-thread-safety.plist")
         let fpv = FilePersistedValue<[EventItem]>(storePath: path)
+        fpv.wrappedValue = []
 
-        queue.async {
-            let event = Event(
-                entity: Entity(type: EntityType.product, id: "xpto"),
-                occurredAt: Date.now
-            )
-            while true {
-                if Int.random(in: 0 ... 2) == 0 {
+        let iterations = 1000
+        let writerQueue = DispatchQueue(label: "com.topsort.test.writer", qos: .background)
+        let readerQueue = DispatchQueue(label: "com.topsort.test.reader", qos: .background)
+        let writerDone = expectation(description: "writer done")
+        let readerDone = expectation(description: "reader done")
+
+        let event = Event(
+            entity: Entity(type: EntityType.product, id: "xpto"),
+            occurredAt: Date.now
+        )
+
+        writerQueue.async {
+            for i in 0 ..< iterations {
+                if i % 3 == 0 {
                     fpv.wrappedValue = []
                 } else {
                     fpv.wrappedValue?.append(.click(event))
                 }
             }
+            writerDone.fulfill()
         }
 
-        // This is as low as I could get to reproduce the error consistently
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        readerQueue.async {
+            for _ in 0 ..< iterations {
+                _ = fpv.wrappedValue
+            }
+            readerDone.fulfill()
+        }
+
+        await fulfillment(of: [writerDone, readerDone], timeout: 10)
+        XCTAssertNotNil(fpv.wrappedValue)
     }
 }
