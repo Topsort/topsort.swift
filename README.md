@@ -25,7 +25,9 @@ import Topsort
 @main
 struct MyApp: App {
     init() {
-        try! Topsort.shared.configure(apiKey: "your-api-key", auctionsTimeout: 20)
+        var config = Configuration(apiKey: "your-api-key")
+        config.auctionsTimeout = 20
+        try! Topsort.shared.configure(config)
     }
     var body: some Scene {
         WindowGroup {

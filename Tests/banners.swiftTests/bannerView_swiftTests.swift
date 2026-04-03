@@ -4,7 +4,9 @@ import XCTest
 
 class TopsortBannerTests: XCTestCase {
     func testTopsortBannerInitialization() throws {
-        try Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
+        var config = Configuration(apiKey: "test_api_key")
+        config.url = "test_url"
+        try Topsort.shared.configure(config)
         let expectation = self.expectation(description: "Button clicked action")
         let banner = TopsortBanner(bannerAuctionBuilder: .init(
             slotId: "test_slot_id",
@@ -27,7 +29,9 @@ class TopsortBannerTests: XCTestCase {
 
         // Mock Topsort and response
         let mockTopsort = MockTopsort(executeAuctionsMockResponse: auctionResponse)
-        try Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
+        var config = Configuration(apiKey: "test_api_key")
+        config.url = "test_url"
+        try Topsort.shared.configure(config)
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
@@ -52,7 +56,9 @@ class TopsortBannerTests: XCTestCase {
         let auctionResponse = AuctionResponse(results: [auctionResult])
 
         let mockTopsort = MockTopsort(executeAuctionsMockResponse: auctionResponse)
-        try Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
+        var config = Configuration(apiKey: "test_api_key")
+        config.url = "test_url"
+        try Topsort.shared.configure(config)
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
@@ -72,7 +78,9 @@ class TopsortBannerTests: XCTestCase {
         let auctionResponse = AuctionResponse(results: [auctionResult])
 
         let mockTopsort = MockTopsort(executeAuctionsMockResponse: auctionResponse)
-        try Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
+        var config = Configuration(apiKey: "test_api_key")
+        config.url = "test_url"
+        try Topsort.shared.configure(config)
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
@@ -92,7 +100,9 @@ class TopsortBannerTests: XCTestCase {
 
     func testExecuteAuctionsCallsOnError() async throws {
         let failingMock = FailingMockTopsort()
-        try Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
+        var config = Configuration(apiKey: "test_api_key")
+        config.url = "test_url"
+        try Topsort.shared.configure(config)
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
@@ -111,7 +121,7 @@ private class FailingMockTopsort: TopsortProtocol {
     var opaqueUserId: String = "test"
     var isConfigured: Bool = true
     func set(opaqueUserId _: String?) {}
-    func configure(apiKey _: String, url _: String?, auctionsTimeout _: TimeInterval?) throws {}
+    func configure(_: Configuration) throws {}
     func track(impression _: Event) {}
     func track(click _: Event) {}
     func track(purchase _: PurchaseEvent) {}
