@@ -6,24 +6,29 @@ enum EventItem: Codable {
     case click(Event)
     case impression(Event)
     case purchase(PurchaseEvent)
+    case pageview(PageViewEvent)
 }
 
 extension [EventItem] {
     func toEvents() -> Events {
-        let (i, c, p) = reduce(([], [], []), Self.agg)
-        return Events(impressions: i, clicks: c, purchases: p)
-    }
-
-    private static func agg(r: ([Event], [Event], [PurchaseEvent]), e: EventItem) -> ([Event], [Event], [PurchaseEvent]) {
-        let (i, c, p) = r
-        switch e {
-        case let .click(event):
-            return (i, c + [event], p)
-        case let .impression(event):
-            return (i + [event], c, p)
-        case let .purchase(event):
-            return (i, c, p + [event])
+        var impressions: [Event] = []
+        var clicks: [Event] = []
+        var purchases: [PurchaseEvent] = []
+        var pageviews: [PageViewEvent] = []
+        for item in self {
+            switch item {
+            case let .impression(event): impressions.append(event)
+            case let .click(event): clicks.append(event)
+            case let .purchase(event): purchases.append(event)
+            case let .pageview(event): pageviews.append(event)
+            }
         }
+        return Events(
+            impressions: impressions,
+            clicks: clicks,
+            purchases: purchases,
+            pageviews: pageviews
+        )
     }
 }
 

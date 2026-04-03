@@ -210,6 +210,7 @@ private class FailingMockTopsort: TopsortProtocol {
     func track(impression _: Event) {}
     func track(click _: Event) {}
     func track(purchase _: PurchaseEvent) {}
+    func track(pageview _: PageViewEvent) {}
     func flush() {}
     func executeAuctions(auctions _: [Auction]) async throws(AuctionError) -> AuctionResponse {
         throw .emptyResponse
