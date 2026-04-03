@@ -2,7 +2,7 @@ import Foundation
 
 enum Logger {
     private static let lock = NSLock()
-    private static var _logLevel: LogLevel = .error
+    private static var _logLevel: LogLevel = .warning
     static var logLevel: LogLevel {
         get { lock.withLock { _logLevel } }
         set { lock.withLock { _logLevel = newValue } }

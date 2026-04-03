@@ -17,7 +17,7 @@ public struct Configuration {
     public var auctionsTimeout: TimeInterval?
     public var flushAt: Int = 30
     public var flushInterval: TimeInterval = 30
-    public var logLevel: LogLevel = .error
+    public var logLevel: LogLevel = .warning
 
     public init(apiKey: String) {
         self.apiKey = apiKey
