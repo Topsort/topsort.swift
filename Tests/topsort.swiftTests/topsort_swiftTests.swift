@@ -103,5 +103,8 @@ final class topsort_swiftTests: XCTestCase {
 
         await fulfillment(of: [writerDone, readerDone], timeout: 10)
         XCTAssertNotNil(fpv.wrappedValue)
+
+        // Clean up test artifact
+        try? FileManager.default.removeItem(atPath: path)
     }
 }
