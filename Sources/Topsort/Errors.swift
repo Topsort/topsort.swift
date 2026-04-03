@@ -1,5 +1,13 @@
 import Foundation
 
+public enum ConfigurationError: Error {
+    case invalidURL(String)
+}
+
+public enum ValidationError: Error {
+    case qualityScoreCountMismatch(idsCount: Int, scoresCount: Int)
+}
+
 public struct TopsortError: Error, Decodable {
     let message: String
     let errCode: TopsortErrorCode

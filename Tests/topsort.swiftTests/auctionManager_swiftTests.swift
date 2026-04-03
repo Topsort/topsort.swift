@@ -19,10 +19,10 @@ class AuctionManagerTests: XCTestCase {
         super.tearDown()
     }
 
-    func testConfigure() {
+    func testConfigure() throws {
         let apiKey = "testApiKey"
         let urlString = "https://test.com"
-        auctionManager.configure(apiKey: apiKey, url: urlString)
+        try auctionManager.configure(apiKey: apiKey, url: urlString)
 
         XCTAssertEqual(mockClient.apiKey, apiKey)
         XCTAssertEqual(auctionManager.url.absoluteString, "\(urlString)/auctions")

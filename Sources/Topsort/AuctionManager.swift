@@ -22,13 +22,13 @@ class AuctionManager {
     var client: HTTPClient
     var timeoutInterval: TimeInterval = 60
 
-    func configure(apiKey: String, url: String?) {
+    func configure(apiKey: String, url: String?) throws(ConfigurationError) {
         client.apiKey = apiKey
         if let url = url {
-            guard let url = URL(string: "\(url)/auctions") else {
-                fatalError("Invalid URL")
+            guard let parsedURL = URL(string: "\(url)/auctions") else {
+                throw .invalidURL(url)
             }
-            self.url = url
+            self.url = parsedURL
         }
     }
 
