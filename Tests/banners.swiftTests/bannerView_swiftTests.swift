@@ -22,8 +22,8 @@ class TopsortBannerTests: XCTestCase {
 
     func testExecuteAuctions() async throws {
         // Mock the response
-        let asset = Asset(url: "https://example.com")
-        let winner = Winner(rank: 1, asset: [asset], type: "type", id: "id", resolvedBidId: "resolved_bid_id")
+        let asset = Asset(url: "https://example.com", content: nil)
+        let winner = Winner(rank: 1, asset: [asset], type: "type", id: "id", resolvedBidId: "resolved_bid_id", campaignId: nil)
         let auctionResult = AuctionResult(resultType: "result_type", winners: [winner], error: false)
         let auctionResponse = AuctionResponse(results: [auctionResult])
 
@@ -50,8 +50,8 @@ class TopsortBannerTests: XCTestCase {
     }
 
     func testExecuteAuctionsDoesNotTrackImpression() async throws {
-        let asset = Asset(url: "https://example.com")
-        let winner = Winner(rank: 1, asset: [asset], type: "type", id: "id", resolvedBidId: "bid-id")
+        let asset = Asset(url: "https://example.com", content: nil)
+        let winner = Winner(rank: 1, asset: [asset], type: "type", id: "id", resolvedBidId: "bid-id", campaignId: nil)
         let auctionResult = AuctionResult(resultType: "result_type", winners: [winner], error: false)
         let auctionResponse = AuctionResponse(results: [auctionResult])
 
@@ -165,7 +165,7 @@ class TopsortBannerTests: XCTestCase {
     // MARK: - ViewModel edge cases
 
     func testViewModelWinnerWithNoAsset() async throws {
-        let winner = Winner(rank: 1, asset: nil, type: "type", id: "id", resolvedBidId: "bid")
+        let winner = Winner(rank: 1, asset: nil, type: "type", id: "id", resolvedBidId: "bid", campaignId: nil)
         let auctionResult = AuctionResult(resultType: "result_type", winners: [winner], error: false)
         let auctionResponse = AuctionResponse(results: [auctionResult])
 

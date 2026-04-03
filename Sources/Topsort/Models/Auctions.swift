@@ -63,9 +63,8 @@ public struct AuctionProducts: Codable, Equatable {
 public struct Auction: Codable, Equatable {
     /**
      * Discriminator for the type of auction.
-     * Could be one of the following values:
-     * - "listings"
-     * - "banner"
+     * - "listings" — Sponsored listings auction
+     * - "banners" — Banner ad auction
      */
     let type: String
 
@@ -76,6 +75,7 @@ public struct Auction: Codable, Equatable {
 
     /**
      * The ID of the banner placement for which this auction will be run for.
+     * Required for banner auctions.
      */
     let slotId: String?
 
@@ -94,6 +94,16 @@ public struct Auction: Codable, Equatable {
     let searchQuery: String?
     let geoTargeting: AuctionGeoTargeting?
 
+    /**
+     * An opaque user identifier for auction targeting context.
+     */
+    let opaqueUserId: String?
+
+    /**
+     * Unique identifier for the placement where the auction result will be displayed.
+     */
+    let placementId: String?
+
     public init(
         type: String,
         slots: Int,
@@ -102,7 +112,9 @@ public struct Auction: Codable, Equatable {
         products: AuctionProducts? = nil,
         category: AuctionCategory? = nil,
         searchQuery: String? = nil,
-        geoTargeting: AuctionGeoTargeting? = nil
+        geoTargeting: AuctionGeoTargeting? = nil,
+        opaqueUserId: String? = nil,
+        placementId: String? = nil
     ) {
         self.type = type
         self.slots = slots
@@ -112,13 +124,24 @@ public struct Auction: Codable, Equatable {
         self.searchQuery = searchQuery
         self.category = category
         self.products = products
+        self.opaqueUserId = opaqueUserId
+        self.placementId = placementId
     }
 }
 
 // Auctions response models
 
+public struct AssetContent: Codable {
+    public let headingText: String?
+    public let bannerText: String?
+    public let bannerTextColour: String?
+    public let heroImage: String?
+    public let heroImageAltText: String?
+}
+
 public struct Asset: Codable {
     public let url: String
+    public let content: AssetContent?
 }
 
 public struct Winner: Codable {
@@ -127,6 +150,7 @@ public struct Winner: Codable {
     public let type: String
     public let id: String
     public let resolvedBidId: String
+    public let campaignId: String?
 }
 
 public struct AuctionResult: Codable {
