@@ -14,6 +14,7 @@ class EventManagerTests: XCTestCase {
         // Reset singleton state to isolate tests
         eventManager._eventQueue = []
         eventManager._pendingEvents = [:]
+        eventManager.flushAt = 1 // Send immediately for existing tests
         Topsort.shared.set(opaqueUserId: "test-user")
     }
 
@@ -114,6 +115,53 @@ class EventManagerTests: XCTestCase {
         wait(for: [exp], timeout: 3)
 
         // 400 is non-retriable — event should be sent once and dropped
+        XCTAssertEqual(mockClient.postCallCount, 1)
+    }
+
+    // MARK: - Batching
+
+    func testPushBelowThresholdDoesNotSend() {
+        eventManager.flushAt = 10
+
+        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        eventManager.push(event: .impression(event))
+
+        // Wait briefly — send should NOT be triggered
+        let exp = expectation(description: "wait")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exp.fulfill() }
+        wait(for: [exp], timeout: 2)
+
+        XCTAssertFalse(mockClient.postCalled)
+    }
+
+    func testPushAtThresholdTriggersSend() {
+        eventManager.flushAt = 3
+
+        for i in 0 ..< 3 {
+            let event = Event(entity: Entity(type: .product, id: "p\(i)"), occurredAt: Date.now)
+            eventManager.push(event: .impression(event))
+        }
+
+        let predicate = NSPredicate { _, _ in self.mockClient.postCalled }
+        let exp = expectation(for: predicate, evaluatedWith: nil)
+        wait(for: [exp], timeout: 3)
+
+        XCTAssertGreaterThanOrEqual(mockClient.postCallCount, 1)
+    }
+
+    func testFlushSendsQueuedEvents() {
+        eventManager.flushAt = 100 // High threshold so push alone won't trigger
+
+        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        eventManager.push(event: .impression(event))
+
+        // Manually flush
+        eventManager.flush()
+
+        let predicate = NSPredicate { _, _ in self.mockClient.postCalled }
+        let exp = expectation(for: predicate, evaluatedWith: nil)
+        wait(for: [exp], timeout: 3)
+
         XCTAssertEqual(mockClient.postCallCount, 1)
     }
 }

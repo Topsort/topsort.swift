@@ -10,6 +10,7 @@ class TopsortCoreTests: XCTestCase {
         EventManager.shared.client = mockClient
         EventManager.shared._eventQueue = []
         EventManager.shared._pendingEvents = [:]
+        EventManager.shared.flushAt = 1
         try? Topsort.shared.configure(Configuration(apiKey: "test-key"))
     }
 
@@ -104,6 +105,7 @@ class TopsortCoreTests: XCTestCase {
         Topsort.shared.set(opaqueUserId: "test-user")
         let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
         Topsort.shared.track(impression: event)
+        Topsort.shared.flush()
 
         let predicate = NSPredicate { _, _ in self.mockClient.postCalled }
         let exp = expectation(for: predicate, evaluatedWith: nil)
@@ -116,6 +118,7 @@ class TopsortCoreTests: XCTestCase {
         Topsort.shared.set(opaqueUserId: "test-user")
         let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
         Topsort.shared.track(click: event)
+        Topsort.shared.flush()
 
         let predicate = NSPredicate { _, _ in self.mockClient.postCalled }
         let exp = expectation(for: predicate, evaluatedWith: nil)
@@ -128,6 +131,7 @@ class TopsortCoreTests: XCTestCase {
         Topsort.shared.set(opaqueUserId: "test-user")
         let purchase = PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 9.99)], occurredAt: Date.now)
         Topsort.shared.track(purchase: purchase)
+        Topsort.shared.flush()
 
         let predicate = NSPredicate { _, _ in self.mockClient.postCalled }
         let exp = expectation(for: predicate, evaluatedWith: nil)

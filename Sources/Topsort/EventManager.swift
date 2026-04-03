@@ -48,7 +48,7 @@ private let MAX_RETRIES = 50
 class EventManager {
     static let shared = EventManager()
     private let serialQueue = DispatchQueue(label: "com.topsort.analytics.EventManager")
-    private let periodicEvent = PeriodicEvent(interval: 60, action: { EventManager.shared.handlePeriodicEvent() })
+    private var periodicEvent: PeriodicEvent
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.event-queue.plist"))
     var _eventQueue: [EventItem]?
     private var eventQueue: [EventItem] {
@@ -82,14 +82,19 @@ class EventManager {
     }
 
     private var inProgress: Set<UUID> = []
+    var flushAt: Int = 30
+    var flushInterval: TimeInterval = 30
+
     private init() {
         client = HTTPClient(apiKey: nil)
+        periodicEvent = PeriodicEvent(interval: 30, action: { EventManager.shared.handlePeriodicEvent() })
         periodicEvent.start()
     }
 
     var url: URL = EVENTS_TOPSORT_URL
     var client: HTTPClient
-    func configure(apiKey: String, url: String?) throws(ConfigurationError) {
+
+    func configure(apiKey: String, url: String?, flushAt: Int? = nil, flushInterval: TimeInterval? = nil) throws(ConfigurationError) {
         client.apiKey = apiKey
         if let url = url {
             guard let parsedURL = URL(string: "\(url)/events") else {
@@ -97,12 +102,32 @@ class EventManager {
             }
             self.url = parsedURL
         }
+        serialQueue.sync {
+            if let flushAt = flushAt {
+                self.flushAt = flushAt
+            }
+            if let flushInterval = flushInterval {
+                self.flushInterval = flushInterval
+                self.periodicEvent.stop()
+                self.periodicEvent = PeriodicEvent(interval: flushInterval, action: { EventManager.shared.handlePeriodicEvent() })
+                self.periodicEvent.start()
+            }
+        }
     }
 
     func push(event: EventItem) {
         serialQueue.async {
             self.eventQueue.append(event)
+            if self.eventQueue.count >= self.flushAt {
+                self.send()
+            }
+        }
+    }
+
+    func flush() {
+        serialQueue.async {
             self.send()
+            self.retry()
         }
     }
 

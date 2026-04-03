@@ -8,6 +8,7 @@ public protocol TopsortProtocol {
     func track(impression event: Event)
     func track(click event: Event)
     func track(purchase event: PurchaseEvent)
+    func flush()
     func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse
 }
 
@@ -33,7 +34,12 @@ public class Topsort: TopsortProtocol {
 
     public func configure(_ configuration: Configuration) throws(ConfigurationError) {
         Logger.logLevel = configuration.logLevel
-        try EventManager.shared.configure(apiKey: configuration.apiKey, url: configuration.url)
+        try EventManager.shared.configure(
+            apiKey: configuration.apiKey,
+            url: configuration.url,
+            flushAt: configuration.flushAt,
+            flushInterval: configuration.flushInterval
+        )
         try AuctionManager.shared.configure(apiKey: configuration.apiKey, url: configuration.url)
         if let timeout = configuration.auctionsTimeout {
             AuctionManager.shared.timeoutInterval = timeout
@@ -71,6 +77,10 @@ public class Topsort: TopsortProtocol {
             return
         }
         EventManager.shared.push(event: .purchase(event))
+    }
+
+    public func flush() {
+        EventManager.shared.flush()
     }
 
     private static func newOpaqueUserId() -> String {
