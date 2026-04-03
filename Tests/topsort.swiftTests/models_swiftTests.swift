@@ -225,4 +225,57 @@ class EventModelTests: XCTestCase {
         XCTAssertTrue(dateString.contains("T"))
         XCTAssertTrue(dateString.contains("."))
     }
+
+    func testTSDateValueDecodeFromISO8601() throws {
+        let json = """
+        {"occurredAt": "2025-01-15T10:30:00.123Z", "opaqueUserId": "u1", "id": "00000000-0000-0000-0000-000000000001", "items": [{"productId": "p1", "unitPrice": 5.0}]}
+        """
+        let data = try XCTUnwrap(json.data(using: .utf8))
+        let event = try JSONDecoder().decode(PurchaseEvent.self, from: data)
+        // Verify it decoded without throwing
+        XCTAssertEqual(event.opaqueUserId, "u1")
+    }
+
+    func testTSDateValueDecodeInvalidDateThrows() throws {
+        let json = """
+        {"occurredAt": "not-a-date", "opaqueUserId": "u1", "id": "00000000-0000-0000-0000-000000000001", "items": [{"productId": "p1", "unitPrice": 5.0}]}
+        """
+        let data = try XCTUnwrap(json.data(using: .utf8))
+        XCTAssertThrowsError(try JSONDecoder().decode(PurchaseEvent.self, from: data))
+    }
+
+    func testTSDateValueRoundTrip() throws {
+        let original = PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 5.0)], occurredAt: Date.now)
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(PurchaseEvent.self, from: encoded)
+        // Dates should be within 1ms (fractional seconds precision)
+        XCTAssertEqual(decoded.occurredAt.timeIntervalSince1970, original.occurredAt.timeIntervalSince1970, accuracy: 0.001)
+    }
+
+    // MARK: - Events init variants
+
+    func testEventsInitWithClicksFirst() throws {
+        let click = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        let events = Events(clicks: [click])
+        let data = try JSONEncoder().encode(events)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual((json["clicks"] as? [Any])?.count, 1)
+    }
+
+    func testEventsInitWithPurchasesFirst() throws {
+        let purchase = PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 5.0)], occurredAt: Date.now)
+        let events = Events(purchases: [purchase])
+        let data = try JSONEncoder().encode(events)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual((json["purchases"] as? [Any])?.count, 1)
+    }
+
+    func testPlacementMinimalInit() throws {
+        let placement = Placement(path: "/home")
+        let data = try JSONEncoder().encode(placement)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["path"] as? String, "/home")
+        XCTAssertNil(json["position"])
+        XCTAssertNil(json["page"])
+    }
 }

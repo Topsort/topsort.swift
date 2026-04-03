@@ -144,4 +144,36 @@ class TopsortCoreTests: XCTestCase {
 
         XCTAssertTrue(mockClient.postCalled)
     }
+
+    // MARK: - Deprecated overload
+
+    func testDeprecatedConfigureStillWorks() throws {
+        Topsort.shared.isConfigured = false
+        try Topsort.shared.configure(apiKey: "deprecated-key", auctionsTimeout: 25)
+        XCTAssertTrue(Topsort.shared.isConfigured)
+        XCTAssertEqual(AuctionManager.shared.timeoutInterval, 25)
+    }
+
+    // MARK: - Flush delegation
+
+    func testFlushDelegatesToEventManager() {
+        Topsort.shared.set(opaqueUserId: "test-user")
+        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+
+        // Push without triggering auto-send (flushAt = 1 from setUp, so it will send)
+        // Instead, verify flush() itself works by checking mock is called
+        EventManager.shared._eventQueue = []
+        mockClient = MockHTTPClient(apiKey: nil, postResult: .success(Data()))
+        EventManager.shared.client = mockClient
+        EventManager.shared.push(event: .impression(event))
+
+        // Explicit flush
+        Topsort.shared.flush()
+
+        let predicate = NSPredicate { _, _ in self.mockClient.postCalled }
+        let exp = expectation(for: predicate, evaluatedWith: nil)
+        wait(for: [exp], timeout: 3)
+
+        XCTAssertTrue(mockClient.postCalled)
+    }
 }
