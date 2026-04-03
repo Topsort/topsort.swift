@@ -29,7 +29,7 @@ public class Topsort: TopsortProtocol {
         _opaqueUserId = opaqueUserId ?? Self.newOpaqueUserId()
     }
 
-    public func configure(apiKey: String, url: String? = nil, auctionsTimeout: TimeInterval? = nil) throws {
+    public func configure(apiKey: String, url: String? = nil, auctionsTimeout: TimeInterval? = nil) throws(ConfigurationError) {
         try EventManager.shared.configure(apiKey: apiKey, url: url)
         try AuctionManager.shared.configure(apiKey: apiKey, url: url)
         if let timeout = auctionsTimeout {
