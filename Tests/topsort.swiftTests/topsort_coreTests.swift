@@ -11,6 +11,11 @@ class TopsortCoreTests: XCTestCase {
         EventManager.shared._eventQueue = []
         EventManager.shared._pendingEvents = [:]
         EventManager.shared.flushAt = 1
+        #if canImport(Network)
+            let mockNetwork = MockNetworkMonitor()
+            mockNetwork.isConnected = true
+            EventManager.shared.networkMonitor = mockNetwork
+        #endif
         try? Topsort.shared.configure(Configuration(apiKey: "test-key"))
     }
 
