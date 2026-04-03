@@ -13,7 +13,7 @@ public protocol TopsortProtocol {
 
 public class Topsort: TopsortProtocol {
     public static let shared = Topsort()
-    public private(set) var isConfigured = false
+    public internal(set) var isConfigured = false
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.opaque-user-id.plist"))
     private var _opaqueUserId: String?
     public var opaqueUserId: String {

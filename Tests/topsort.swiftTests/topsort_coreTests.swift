@@ -43,35 +43,46 @@ class TopsortCoreTests: XCTestCase {
         XCTAssertNotNil(UUID(uuidString: uid))
     }
 
-    // MARK: - isConfigured guard
+    // MARK: - isConfigured guard (tests real Topsort.shared)
 
-    func testTrackImpressionDroppedWhenNotConfigured() {
-        // Verify via the protocol contract: a non-configured mock should not
-        // forward events. We test the TopsortProtocol.track() guard pattern
-        // by using a tracking mock that starts unconfigured.
-        let mock = TrackingUnconfiguredTopsort()
-        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now, opaqueUserId: "test")
-        mock.track(impression: event)
-        mock.track(click: event)
+    func testTrackDropsEventsWhenNotConfigured() {
+        // Temporarily set Topsort.shared to unconfigured
+        Topsort.shared.isConfigured = false
 
-        let purchase = PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 5.0)], occurredAt: Date.now, opaqueUserId: "test")
-        mock.track(purchase: purchase)
+        Topsort.shared.set(opaqueUserId: "test-user")
+        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        Topsort.shared.track(impression: event)
+        Topsort.shared.track(click: event)
 
-        XCTAssertEqual(mock.impressionCount, 0, "Impression should be dropped when not configured")
-        XCTAssertEqual(mock.clickCount, 0, "Click should be dropped when not configured")
-        XCTAssertEqual(mock.purchaseCount, 0, "Purchase should be dropped when not configured")
+        let purchase = PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 5.0)], occurredAt: Date.now)
+        Topsort.shared.track(purchase: purchase)
+
+        // Wait briefly for any async dispatch
+        let exp = expectation(description: "wait")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exp.fulfill() }
+        wait(for: [exp], timeout: 2)
+
+        // Events should have been dropped — mock client should NOT be called
+        XCTAssertFalse(mockClient.postCalled, "Events should be dropped when not configured")
+
+        // Restore configured state
+        Topsort.shared.isConfigured = true
     }
 
-    func testExecuteAuctionsThrowsNotConfiguredViaProtocol() async {
-        let mock = TrackingUnconfiguredTopsort()
+    func testExecuteAuctionsThrowsWhenNotConfigured() async {
+        Topsort.shared.isConfigured = false
+
         do {
-            _ = try await mock.executeAuctions(auctions: [Auction(type: "listings", slots: 1)])
-            XCTFail("Should have thrown")
+            _ = try await Topsort.shared.executeAuctions(auctions: [Auction(type: "listings", slots: 1)])
+            XCTFail("Should have thrown .notConfigured")
         } catch {
             if case .notConfigured = error {} else {
                 XCTFail("Expected .notConfigured, got \(error)")
             }
         }
+
+        // Restore
+        Topsort.shared.isConfigured = true
     }
 
     // MARK: - Configure
@@ -125,36 +136,5 @@ class TopsortCoreTests: XCTestCase {
         wait(for: [exp], timeout: 3)
 
         XCTAssertTrue(mockClient.postCalled)
-    }
-}
-
-/// A TopsortProtocol conformer that mimics the isConfigured guard behavior
-private class TrackingUnconfiguredTopsort: TopsortProtocol {
-    var opaqueUserId: String = "test"
-    var isConfigured: Bool = false
-    var impressionCount = 0
-    var clickCount = 0
-    var purchaseCount = 0
-
-    func set(opaqueUserId _: String?) {}
-    func configure(apiKey _: String, url _: String?, auctionsTimeout _: TimeInterval?) throws {}
-
-    func track(impression _: Event) {
-        guard isConfigured else { return }
-        impressionCount += 1
-    }
-
-    func track(click _: Event) {
-        guard isConfigured else { return }
-        clickCount += 1
-    }
-
-    func track(purchase _: PurchaseEvent) {
-        guard isConfigured else { return }
-        purchaseCount += 1
-    }
-
-    func executeAuctions(auctions _: [Auction]) async throws(AuctionError) -> AuctionResponse {
-        throw .notConfigured
     }
 }
