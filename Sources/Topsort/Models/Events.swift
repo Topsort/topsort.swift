@@ -76,12 +76,12 @@ public struct Entity: Codable {
 public struct Page: Codable {
     /// The type of page (e.g. "category", "product", "search", "home").
     let type: String
-    /// An identifier for the page.
-    let pageId: String?
+    /// An identifier for the page (required by the API).
+    let pageId: String
     /// A value associated with the page (e.g. category name, search query).
     let value: String?
 
-    public init(type: String, pageId: String? = nil, value: String? = nil) {
+    public init(type: String, pageId: String, value: String? = nil) {
         self.type = type
         self.pageId = pageId
         self.value = value
@@ -120,6 +120,9 @@ public struct Event: Codable {
 
     let placement: Placement?
 
+    /// Page context for the event.
+    let page: Page?
+
     /// Device type: "desktop" or "mobile".
     let deviceType: String?
 
@@ -137,6 +140,7 @@ public struct Event: Codable {
         occurredAt: Date,
         opaqueUserId: String = Topsort.shared.opaqueUserId,
         placement: Placement? = nil,
+        page: Page? = nil,
         deviceType: String? = nil,
         channel: String? = nil,
         additionalAttribution: Entity? = nil,
@@ -147,6 +151,7 @@ public struct Event: Codable {
         self.opaqueUserId = opaqueUserId
         resolvedBidId = nil
         self.placement = placement
+        self.page = page
         self.deviceType = deviceType
         self.channel = channel
         self.additionalAttribution = additionalAttribution
@@ -159,6 +164,7 @@ public struct Event: Codable {
         occurredAt: Date,
         opaqueUserId: String = Topsort.shared.opaqueUserId,
         placement: Placement? = nil,
+        page: Page? = nil,
         deviceType: String? = nil,
         channel: String? = nil,
         additionalAttribution: Entity? = nil,
@@ -169,6 +175,7 @@ public struct Event: Codable {
         self.opaqueUserId = opaqueUserId
         self.resolvedBidId = resolvedBidId
         self.placement = placement
+        self.page = page
         self.deviceType = deviceType
         self.channel = channel
         self.additionalAttribution = additionalAttribution

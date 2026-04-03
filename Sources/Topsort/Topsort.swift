@@ -13,6 +13,11 @@ public protocol TopsortProtocol {
     func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse
 }
 
+/// Default implementation for backward compatibility with existing conformers.
+public extension TopsortProtocol {
+    func track(pageview _: PageViewEvent) {}
+}
+
 public class Topsort: TopsortProtocol {
     public static let shared = Topsort()
     public internal(set) var isConfigured = false
