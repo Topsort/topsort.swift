@@ -140,12 +140,15 @@ class EventModelTests: XCTestCase {
     }
 
     func testAuctionCategoryWithIds() throws {
-        let category = AuctionCategory(ids: ["c1", "c2"], disjunctions: ["d1"])
+        let category = AuctionCategory(ids: ["c1", "c2"], disjunctions: [["d1", "d2"], ["d3"]])
         let data = try JSONEncoder().encode(category)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         XCTAssertEqual((json["ids"] as? [String])?.count, 2)
-        XCTAssertEqual((json["disjunctions"] as? [String])?.count, 1)
+        let disjunctions = try XCTUnwrap(json["disjunctions"] as? [[String]])
+        XCTAssertEqual(disjunctions.count, 2)
+        XCTAssertEqual(disjunctions[0], ["d1", "d2"])
+        XCTAssertEqual(disjunctions[1], ["d3"])
     }
 
     func testAuctionResponseDecoding() throws {
