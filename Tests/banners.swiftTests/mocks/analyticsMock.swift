@@ -35,6 +35,10 @@ public class MockTopsort: TopsortProtocol {
         trackedPurchases.append(event)
     }
 
+    public func flush() {
+        // Mock implementation
+    }
+
     public func executeAuctions(auctions _: [Auction]) async throws(AuctionError) -> AuctionResponse {
         return executeAuctionsMockResponse
     }
