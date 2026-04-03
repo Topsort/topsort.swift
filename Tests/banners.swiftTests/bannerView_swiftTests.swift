@@ -91,9 +91,6 @@ class TopsortBannerTests: XCTestCase {
     }
 
     func testExecuteAuctionsCallsOnError() async throws {
-        let mockTopsort = MockTopsort(executeAuctionsMockResponse: AuctionResponse(results: []))
-
-        // Override to throw
         let failingMock = FailingMockTopsort()
         try Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
 
@@ -107,7 +104,6 @@ class TopsortBannerTests: XCTestCase {
         await vm.executeAuctions(auction: auction, topsort: failingMock, onError: { error in errorReceived = error }, onNoWinners: nil)
 
         XCTAssertNotNil(errorReceived)
-        _ = mockTopsort // suppress unused warning
     }
 }
 

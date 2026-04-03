@@ -12,7 +12,7 @@ class HTTPClientErrorTests: XCTestCase {
 
     func testStatusCode400IsNotRetriable() {
         let error = HTTPClientError.statusCode(code: 400, data: nil)
-        XCTAssertFalse(error.isRetriable())
+        XCTAssertFalse(error.isRetriable(), "400 Bad Request should NOT be retriable")
     }
 
     func testStatusCode401IsRetriable() {
@@ -20,8 +20,8 @@ class HTTPClientErrorTests: XCTestCase {
         XCTAssertTrue(error.isRetriable())
     }
 
-    func testStatusCode500IsRetriable() {
-        let error = HTTPClientError.statusCode(code: 500, data: nil)
+    func testStatusCode403IsRetriable() {
+        let error = HTTPClientError.statusCode(code: 403, data: nil)
         XCTAssertTrue(error.isRetriable())
     }
 
@@ -30,9 +30,29 @@ class HTTPClientErrorTests: XCTestCase {
         XCTAssertTrue(error.isRetriable())
     }
 
+    func testStatusCode500IsRetriable() {
+        let error = HTTPClientError.statusCode(code: 500, data: nil)
+        XCTAssertTrue(error.isRetriable())
+    }
+
+    func testStatusCode502IsRetriable() {
+        let error = HTTPClientError.statusCode(code: 502, data: nil)
+        XCTAssertTrue(error.isRetriable())
+    }
+
     func testStatusCode503IsRetriable() {
         let error = HTTPClientError.statusCode(code: 503, data: nil)
         XCTAssertTrue(error.isRetriable())
+    }
+
+    func testOnly400IsNonRetriable() {
+        // Verify that 400 is the ONLY non-retriable status code
+        for code in [401, 403, 404, 408, 429, 500, 502, 503, 504] {
+            let error = HTTPClientError.statusCode(code: code, data: nil)
+            XCTAssertTrue(error.isRetriable(), "HTTP \(code) should be retriable")
+        }
+        let error400 = HTTPClientError.statusCode(code: 400, data: nil)
+        XCTAssertFalse(error400.isRetriable(), "Only HTTP 400 should be non-retriable")
     }
 
     // MARK: - ErrorData parsing
@@ -71,22 +91,20 @@ class HTTPClientErrorTests: XCTestCase {
     }
 }
 
-class HTTPClientRequestTests: XCTestCase {
-    func testRequestIncludesContentType() {
-        let client = HTTPClient(apiKey: "test-key")
-        // We can't access newRequest directly (private), but we can verify
-        // by inspecting the mock's received data format is JSON
-        // This is an indirect test — the real verification is that
-        // AuctionManager and EventManager produce valid JSON payloads
-        XCTAssertNotNil(client)
-    }
-
-    func testClientUsesEphemeralSession() {
-        // Verify client initializes without crashing
+class HTTPClientInitTests: XCTestCase {
+    func testClientInitWithNilApiKey() {
         let client = HTTPClient(apiKey: nil)
         XCTAssertNil(client.apiKey)
+    }
 
-        let clientWithKey = HTTPClient(apiKey: "test-key")
-        XCTAssertEqual(clientWithKey.apiKey, "test-key")
+    func testClientInitWithApiKey() {
+        let client = HTTPClient(apiKey: "test-key")
+        XCTAssertEqual(client.apiKey, "test-key")
+    }
+
+    func testClientApiKeyMutable() {
+        let client = HTTPClient(apiKey: nil)
+        client.apiKey = "new-key"
+        XCTAssertEqual(client.apiKey, "new-key")
     }
 }
