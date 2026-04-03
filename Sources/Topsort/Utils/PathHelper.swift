@@ -28,7 +28,11 @@ class PathHelper {
             guard fileManager.fileExists(atPath: oldPath),
                   !fileManager.fileExists(atPath: newPath)
             else { continue }
-            try? fileManager.moveItem(atPath: oldPath, toPath: newPath)
+            do {
+                try fileManager.moveItem(atPath: oldPath, toPath: newPath)
+            } catch {
+                print("[Topsort] Failed to migrate \(file): \(error)")
+            }
         }
     }
 }
