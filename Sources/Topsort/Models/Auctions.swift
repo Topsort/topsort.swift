@@ -139,7 +139,45 @@ public struct Asset: Codable {
 
     /// Flexible content fields for banner templates.
     /// Keys and values vary per marketplace configuration.
+    /// The API schema allows arbitrary JSON values (additionalProperties: true),
+    /// so non-string values are converted to their string representation.
     public let content: [String: String]?
+
+    public init(url: String, content: [String: String]? = nil) {
+        self.url = url
+        self.content = content
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        url = try container.decode(String.self, forKey: .url)
+        // Lenient decoding: skip non-string values instead of crashing
+        if let raw = try? container.decodeIfPresent([String: LenientStringValue].self, forKey: .content) {
+            content = raw.compactMapValues(\.value)
+        } else {
+            content = nil
+        }
+    }
+}
+
+/// Decodes any JSON primitive as a String, returning nil for non-decodable values.
+private struct LenientStringValue: Decodable {
+    let value: String?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let s = try? container.decode(String.self) {
+            value = s
+        } else if let i = try? container.decode(Int.self) {
+            value = String(i)
+        } else if let d = try? container.decode(Double.self) {
+            value = String(d)
+        } else if let b = try? container.decode(Bool.self) {
+            value = String(b)
+        } else {
+            value = nil
+        }
+    }
 }
 
 public struct Winner: Codable {
