@@ -50,7 +50,7 @@ class EventManager {
     private let serialQueue = DispatchQueue(label: "com.topsort.analytics.EventManager")
     private let periodicEvent = PeriodicEvent(interval: 60, action: { EventManager.shared.handlePeriodicEvent() })
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.event-queue.plist"))
-    private var _eventQueue: [EventItem]?
+    var _eventQueue: [EventItem]?
     private var eventQueue: [EventItem] {
         get {
             if let eq = _eventQueue {
@@ -66,7 +66,7 @@ class EventManager {
     }
 
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.pending-events.plist"))
-    private var _pendingEvents: [UUID: PendingEvents]?
+    var _pendingEvents: [UUID: PendingEvents]?
     private var pendingEvents: [UUID: PendingEvents] {
         get {
             if let pe = _pendingEvents {
