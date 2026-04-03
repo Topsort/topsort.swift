@@ -87,6 +87,8 @@ class EventManager {
 
     private init() {
         client = HTTPClient(apiKey: nil)
+        __eventQueue.deferPersistence = true
+        __pendingEvents.deferPersistence = true
         periodicEvent = PeriodicEvent(interval: 30, action: { EventManager.shared.handlePeriodicEvent() })
         periodicEvent.start()
     }
@@ -119,42 +121,50 @@ class EventManager {
         serialQueue.async {
             self.eventQueue.append(event)
             if self.eventQueue.count >= self.flushAt {
-                self.send()
+                self.performSend()
             }
         }
     }
 
     func flush() {
         serialQueue.async {
-            self.send()
-            self.retry()
+            self.performSend()
+            self.performRetry()
         }
     }
 
-    private func send() {
-        serialQueue.async {
-            // TODO: check network connectivity
-            if self.inProgress.count > MAX_IN_PROGRESS {
-                return
-            }
-            if self.eventQueue.isEmpty {
-                return
-            }
-            let events = self.eventQueue.toEvents()
-            guard let data = try? JSONEncoder().encode(events) else {
-                Logger.error("Failed to serialize events: \(events)")
-                return
-            }
-            let id = UUID()
-            let pendingEvents = PendingEvents(id: id, data: data, createdAt: Date(), retries: 0, lastRetry: Date())
-            self.pendingEvents[id] = pendingEvents
-            self.inProgress.insert(id)
-
-            self.client.post(url: self.url, data: data, callback: { r in
-                self.process_response(id: id, result: r)
-            })
-            self.eventQueue = []
+    func flushAndPersist() {
+        serialQueue.sync {
+            self.performSend()
+            self.performRetry()
+            self.__eventQueue.persistIfDirty()
+            self.__pendingEvents.persistIfDirty()
         }
+    }
+
+    /// Must be called on serialQueue
+    private func performSend() {
+        // TODO: check network connectivity
+        if inProgress.count > MAX_IN_PROGRESS {
+            return
+        }
+        if eventQueue.isEmpty {
+            return
+        }
+        let events = eventQueue.toEvents()
+        guard let data = try? JSONEncoder().encode(events) else {
+            Logger.error("Failed to serialize events: \(events)")
+            return
+        }
+        let id = UUID()
+        let pending = PendingEvents(id: id, data: data, createdAt: Date(), retries: 0, lastRetry: Date())
+        pendingEvents[id] = pending
+        inProgress.insert(id)
+
+        client.post(url: url, data: data, callback: { r in
+            self.process_response(id: id, result: r)
+        })
+        eventQueue = []
     }
 
     private func process_response(id: UUID, result: Result<Data?, HTTPClientError>) {
@@ -179,30 +189,27 @@ class EventManager {
         }
     }
 
-    private func retry() {
-        serialQueue.async {
-            // TODO: check network connectivity - NWPathMonitor
-            if self.inProgress.count > MAX_IN_PROGRESS {
-                return
-            }
-            let now = Date()
-            let pendingEvents = self
-                .pendingEvents
-                .values
-                .filter { !self.inProgress.contains($0.id) && $0.retryAfter < now }
-                .sorted(by: { a, b in a.retries < b.retries })
-                .prefix(MAX_IN_PROGRESS - self.inProgress.count)
-            for pendingEvent in pendingEvents {
-                self.inProgress.insert(pendingEvent.id)
-                self.client.post(url: self.url, data: pendingEvent.data, callback: { r in
-                    self.process_response(id: pendingEvent.id, result: r)
-                })
-            }
+    /// Must be called on serialQueue
+    private func performRetry() {
+        // TODO: check network connectivity - NWPathMonitor
+        if inProgress.count > MAX_IN_PROGRESS {
+            return
+        }
+        let now = Date()
+        let retryable = pendingEvents
+            .values
+            .filter { !inProgress.contains($0.id) && $0.retryAfter < now }
+            .sorted(by: { a, b in a.retries < b.retries })
+            .prefix(MAX_IN_PROGRESS - inProgress.count)
+        for pendingEvent in retryable {
+            inProgress.insert(pendingEvent.id)
+            client.post(url: url, data: pendingEvent.data, callback: { r in
+                self.process_response(id: pendingEvent.id, result: r)
+            })
         }
     }
 
     private func handlePeriodicEvent() {
-        send()
-        retry()
+        flush()
     }
 }
