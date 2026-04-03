@@ -102,7 +102,7 @@ public struct Auction: Codable, Equatable {
     /**
      * Unique identifier for the placement where the auction result will be displayed.
      */
-    let placementId: String?
+    let placementId: Int?
 
     public init(
         type: String,
@@ -114,7 +114,7 @@ public struct Auction: Codable, Equatable {
         searchQuery: String? = nil,
         geoTargeting: AuctionGeoTargeting? = nil,
         opaqueUserId: String? = nil,
-        placementId: String? = nil
+        placementId: Int? = nil
     ) {
         self.type = type
         self.slots = slots
@@ -131,17 +131,12 @@ public struct Auction: Codable, Equatable {
 
 // Auctions response models
 
-public struct AssetContent: Codable {
-    public let headingText: String?
-    public let bannerText: String?
-    public let bannerTextColour: String?
-    public let heroImage: String?
-    public let heroImageAltText: String?
-}
-
 public struct Asset: Codable {
     public let url: String
-    public let content: AssetContent?
+
+    /// Flexible content fields for banner templates.
+    /// Keys and values vary per marketplace configuration.
+    public let content: [String: String]?
 }
 
 public struct Winner: Codable {
