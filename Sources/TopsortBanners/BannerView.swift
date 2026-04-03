@@ -129,6 +129,13 @@ public struct TopsortBanner: View {
         auction = bannerAuctionBuilder.build()
     }
 
+    private func trackImpression() {
+        if let rab = viewModel.resolvedBidId {
+            let event = Event(resolvedBidId: rab, occurredAt: Date.now)
+            topsort.track(impression: event)
+        }
+    }
+
     private func buttonClicked() {
         if let rab = viewModel.resolvedBidId {
             let event = Event(resolvedBidId: rab, occurredAt: Date.now, opaqueUserId: topsort.opaqueUserId)
@@ -147,7 +154,10 @@ public struct TopsortBanner: View {
                         RemoteImage(
                             url: url,
                             contentMode: self.contentMode,
-                            onSuccess: { self.onImageLoad?() },
+                            onSuccess: {
+                                self.trackImpression()
+                                self.onImageLoad?()
+                            },
                             onFailure: { error in self.onError?(.unknown(error: error)) }
                         )
                     }
@@ -216,9 +226,6 @@ extension TopsortBanner {
             guard let asset = winner.asset?.first else { return }
             resolvedBidId = winner.resolvedBidId
             urlString = asset.url
-
-            let event = Event(resolvedBidId: winner.resolvedBidId, occurredAt: Date.now, opaqueUserId: topsort.opaqueUserId)
-            topsort.track(impression: event)
         }
     }
 }
