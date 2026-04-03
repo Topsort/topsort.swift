@@ -4,7 +4,7 @@ public protocol TopsortProtocol {
     var opaqueUserId: String { get }
     var isConfigured: Bool { get }
     func set(opaqueUserId: String?)
-    func configure(apiKey: String, url: String?, auctionsTimeout: TimeInterval?) throws
+    func configure(_ configuration: Configuration) throws
     func track(impression event: Event)
     func track(click event: Event)
     func track(purchase event: PurchaseEvent)
@@ -31,13 +31,21 @@ public class Topsort: TopsortProtocol {
         _opaqueUserId = opaqueUserId ?? Self.newOpaqueUserId()
     }
 
-    public func configure(apiKey: String, url: String? = nil, auctionsTimeout: TimeInterval? = nil) throws(ConfigurationError) {
-        try EventManager.shared.configure(apiKey: apiKey, url: url)
-        try AuctionManager.shared.configure(apiKey: apiKey, url: url)
-        if let timeout = auctionsTimeout {
+    public func configure(_ configuration: Configuration) throws(ConfigurationError) {
+        try EventManager.shared.configure(apiKey: configuration.apiKey, url: configuration.url)
+        try AuctionManager.shared.configure(apiKey: configuration.apiKey, url: configuration.url)
+        if let timeout = configuration.auctionsTimeout {
             AuctionManager.shared.timeoutInterval = timeout
         }
         isConfigured = true
+    }
+
+    @available(*, deprecated, message: "Use configure(_:) with a Configuration struct")
+    public func configure(apiKey: String, url: String? = nil, auctionsTimeout: TimeInterval? = nil) throws {
+        var config = Configuration(apiKey: apiKey)
+        config.url = url
+        config.auctionsTimeout = auctionsTimeout
+        try configure(config)
     }
 
     public func track(impression event: Event) {

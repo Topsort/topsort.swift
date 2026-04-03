@@ -10,7 +10,7 @@ class TopsortCoreTests: XCTestCase {
         EventManager.shared.client = mockClient
         EventManager.shared._eventQueue = []
         EventManager.shared._pendingEvents = [:]
-        try? Topsort.shared.configure(apiKey: "test-key")
+        try? Topsort.shared.configure(Configuration(apiKey: "test-key"))
     }
 
     override func tearDown() {
@@ -86,12 +86,16 @@ class TopsortCoreTests: XCTestCase {
     }
 
     func testConfigureWithCustomTimeout() throws {
-        try Topsort.shared.configure(apiKey: "key", auctionsTimeout: 15)
+        var config = Configuration(apiKey: "key")
+        config.auctionsTimeout = 15
+        try Topsort.shared.configure(config)
         XCTAssertEqual(AuctionManager.shared.timeoutInterval, 15)
     }
 
     func testConfigureWithValidURL() {
-        XCTAssertNoThrow(try Topsort.shared.configure(apiKey: "key", url: "https://custom.api.com"))
+        var config = Configuration(apiKey: "key")
+        config.url = "https://custom.api.com"
+        XCTAssertNoThrow(try Topsort.shared.configure(config))
     }
 
     // MARK: - Track events after configure (integration)
