@@ -3,8 +3,8 @@
 import XCTest
 
 class TopsortBannerTests: XCTestCase {
-    func testTopsortBannerInitialization() {
-        Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
+    func testTopsortBannerInitialization() throws {
+        try Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
         let expectation = self.expectation(description: "Button clicked action")
         let banner = TopsortBanner(bannerAuctionBuilder: .init(
             slotId: "test_slot_id",
@@ -18,7 +18,7 @@ class TopsortBannerTests: XCTestCase {
         wait(for: [expectation], timeout: 1.0)
     }
 
-    func testExecuteAuctions() async {
+    func testExecuteAuctions() async throws {
         // Mock the response
         let asset = Asset(url: "https://example.com")
         let winner = Winner(rank: 1, asset: [asset], type: "type", id: "id", resolvedBidId: "resolved_bid_id")
@@ -27,7 +27,7 @@ class TopsortBannerTests: XCTestCase {
 
         // Mock Topsort and response
         let mockTopsort = MockTopsort(executeAuctionsMockResponse: auctionResponse)
-        Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
+        try Topsort.shared.configure(apiKey: "test_api_key", url: "test_url")
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",

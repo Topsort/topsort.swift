@@ -89,13 +89,13 @@ class EventManager {
 
     private var url: URL = EVENTS_TOPSORT_URL
     private var client: HTTPClient
-    func configure(apiKey: String, url: String?) {
+    func configure(apiKey: String, url: String?) throws(ConfigurationError) {
         client.apiKey = apiKey
         if let url = url {
-            guard let url = URL(string: "\(url)/events") else {
-                fatalError("Invalid URL")
+            guard let parsedURL = URL(string: "\(url)/events") else {
+                throw .invalidURL(url)
             }
-            self.url = url
+            self.url = parsedURL
         }
     }
 

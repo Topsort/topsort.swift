@@ -49,9 +49,9 @@ public struct AuctionProducts: Codable, Equatable {
      */
     let qualityScores: [Double]?
 
-    public init(ids: [String], qualityScores: [Double]? = nil) {
-        if qualityScores != nil, ids.count != qualityScores!.count {
-            fatalError("The number of quality scores must match the number of product IDs.")
+    public init(ids: [String], qualityScores: [Double]? = nil) throws(ValidationError) {
+        if let scores = qualityScores, ids.count != scores.count {
+            throw .qualityScoreCountMismatch(idsCount: ids.count, scoresCount: scores.count)
         }
         self.ids = ids
         self.qualityScores = qualityScores

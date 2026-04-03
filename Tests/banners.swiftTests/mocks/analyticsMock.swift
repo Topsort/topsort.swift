@@ -14,7 +14,7 @@ public class MockTopsort: TopsortProtocol {
         // Mock implementation
     }
 
-    public func configure(apiKey _: String, url _: String?, auctionsTimeout _: TimeInterval?) {
+    public func configure(apiKey _: String, url _: String?, auctionsTimeout _: TimeInterval?) throws {
         // Mock implementation
     }
 

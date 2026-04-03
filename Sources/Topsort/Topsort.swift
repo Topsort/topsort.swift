@@ -3,7 +3,7 @@ import Foundation
 public protocol TopsortProtocol {
     var opaqueUserId: String { get }
     func set(opaqueUserId: String?)
-    func configure(apiKey: String, url: String?, auctionsTimeout: TimeInterval?)
+    func configure(apiKey: String, url: String?, auctionsTimeout: TimeInterval?) throws
     func track(impression event: Event)
     func track(click event: Event)
     func track(purchase event: PurchaseEvent)
@@ -29,9 +29,9 @@ public class Topsort: TopsortProtocol {
         _opaqueUserId = opaqueUserId ?? Self.newOpaqueUserId()
     }
 
-    public func configure(apiKey: String, url: String? = nil, auctionsTimeout: TimeInterval? = nil) {
-        EventManager.shared.configure(apiKey: apiKey, url: url)
-        AuctionManager.shared.configure(apiKey: apiKey, url: url)
+    public func configure(apiKey: String, url: String? = nil, auctionsTimeout: TimeInterval? = nil) throws(ConfigurationError) {
+        try EventManager.shared.configure(apiKey: apiKey, url: url)
+        try AuctionManager.shared.configure(apiKey: apiKey, url: url)
         if let timeout = auctionsTimeout {
             AuctionManager.shared.timeoutInterval = timeout
         }

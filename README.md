@@ -25,7 +25,7 @@ import Topsort
 @main
 struct MyApp: App {
     init() {
-        Topsort.shared.configure(apiKey: "your-api-key", auctionsTimeout: 20)
+        try! Topsort.shared.configure(apiKey: "your-api-key", auctionsTimeout: 20)
     }
     var body: some Scene {
         WindowGroup {
@@ -43,7 +43,7 @@ View all auction models and their definitions in the [Swift package link](https:
 import SwiftUI
 import Topsort
 
-let products = AuctionProducts(ids: ["p_dsad", "p_dvra", "p_oplf", "p_gjfo"])
+let products = try AuctionProducts(ids: ["p_dsad", "p_dvra", "p_oplf", "p_gjfo"])
 
 let category = AuctionCategory(id: "c_fdfa")
 

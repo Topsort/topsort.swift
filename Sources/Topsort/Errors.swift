@@ -1,5 +1,27 @@
 import Foundation
 
+public enum ConfigurationError: LocalizedError {
+    case invalidURL(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .invalidURL(url):
+            return "Invalid Topsort API URL: \(url)"
+        }
+    }
+}
+
+public enum ValidationError: LocalizedError {
+    case qualityScoreCountMismatch(idsCount: Int, scoresCount: Int)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .qualityScoreCountMismatch(idsCount, scoresCount):
+            return "Quality scores count (\(scoresCount)) must match product IDs count (\(idsCount))"
+        }
+    }
+}
+
 public struct TopsortError: Error, Decodable {
     let message: String
     let errCode: TopsortErrorCode
