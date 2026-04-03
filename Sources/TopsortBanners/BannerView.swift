@@ -129,11 +129,9 @@ public struct TopsortBanner: View {
         auction = bannerAuctionBuilder.build()
     }
 
-    private func trackImpression() {
-        if let rab = viewModel.resolvedBidId {
-            let event = Event(resolvedBidId: rab, occurredAt: Date.now)
-            topsort.track(impression: event)
-        }
+    private func trackImpression(resolvedBidId: String) {
+        let event = Event(resolvedBidId: resolvedBidId, occurredAt: Date.now, opaqueUserId: topsort.opaqueUserId)
+        topsort.track(impression: event)
     }
 
     private func buttonClicked() {
@@ -149,18 +147,21 @@ public struct TopsortBanner: View {
             if viewModel.loading {
                 ProgressView()
             } else {
-                if let image_url = self.viewModel.urlString {
-                    if let url = URL(string: image_url) {
-                        RemoteImage(
-                            url: url,
-                            contentMode: self.contentMode,
-                            onSuccess: {
-                                self.trackImpression()
-                                self.onImageLoad?()
-                            },
-                            onFailure: { error in self.onError?(.unknown(error: error)) }
-                        )
-                    }
+                if let image_url = self.viewModel.urlString,
+                   let url = URL(string: image_url)
+                {
+                    let capturedBidId = self.viewModel.resolvedBidId
+                    RemoteImage(
+                        url: url,
+                        contentMode: self.contentMode,
+                        onSuccess: {
+                            if let bidId = capturedBidId {
+                                self.trackImpression(resolvedBidId: bidId)
+                            }
+                            self.onImageLoad?()
+                        },
+                        onFailure: { error in self.onError?(.unknown(error: error)) }
+                    )
                 }
             }
         }
