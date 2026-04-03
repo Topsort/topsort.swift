@@ -31,7 +31,7 @@ class PathHelper {
             do {
                 try fileManager.moveItem(atPath: oldPath, toPath: newPath)
             } catch {
-                print("[Topsort] Failed to migrate \(file): \(error)")
+                Logger.error("Failed to migrate \(file): \(error)")
             }
         }
     }

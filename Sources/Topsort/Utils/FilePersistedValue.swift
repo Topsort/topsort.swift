@@ -18,7 +18,7 @@ public class FilePersistedValue<T: Codable> {
             let value = try data.map { data in try PropertyListDecoder().decode(PersistedValueWrapper<T>.self, from: data).value }
             self.value = value
         } catch {
-            print("Error loading persisted value: \(error)")
+            Logger.error("Error loading persisted value: \(error)")
         }
     }
 
@@ -42,7 +42,7 @@ public class FilePersistedValue<T: Codable> {
                 let url = URL(fileURLWithPath: self.storePath)
                 try data.write(to: url)
             } catch {
-                print("Error persisting value: \(error)")
+                Logger.error("Error persisting value: \(error)")
             }
         }
     }
