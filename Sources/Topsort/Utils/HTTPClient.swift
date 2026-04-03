@@ -83,7 +83,7 @@ class HTTPClient {
         task.resume()
     }
 
-    private func newRequest(url: URL, method: String) -> URLRequest {
+    func newRequest(url: URL, method: String) -> URLRequest {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
         request.httpMethod = method
         request.addValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")

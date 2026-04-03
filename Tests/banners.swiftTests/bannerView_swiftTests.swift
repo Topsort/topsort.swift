@@ -115,6 +115,91 @@ class TopsortBannerTests: XCTestCase {
 
         XCTAssertNotNil(errorReceived)
     }
+
+    // MARK: - BannerAuctionBuilder
+
+    func testBannerAuctionBuilderBuild() {
+        let builder = BannerAuctionBuilder(slotId: "home", deviceType: "mobile")
+        let auction = builder.build()
+        XCTAssertEqual(auction.type, "banners")
+        XCTAssertEqual(auction.slots, 1)
+        XCTAssertEqual(auction.slotId, "home")
+        XCTAssertEqual(auction.device, "mobile")
+        XCTAssertNil(auction.products)
+        XCTAssertNil(auction.category)
+        XCTAssertNil(auction.searchQuery)
+        XCTAssertNil(auction.geoTargeting)
+    }
+
+    func testBannerAuctionBuilderWithProducts() throws {
+        let products = try AuctionProducts(ids: ["p1", "p2"])
+        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: "desktop")
+            .with(products: products)
+        let auction = builder.build()
+        XCTAssertEqual(auction.products?.ids, ["p1", "p2"])
+    }
+
+    func testBannerAuctionBuilderWithCategory() {
+        let category = AuctionCategory(id: "c1")
+        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile")
+            .with(category: category)
+        let auction = builder.build()
+        XCTAssertEqual(auction.category?.id, "c1")
+    }
+
+    func testBannerAuctionBuilderWithSearchQuery() {
+        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile")
+            .with(searchQuery: "shoes")
+        let auction = builder.build()
+        XCTAssertEqual(auction.searchQuery, "shoes")
+    }
+
+    func testBannerAuctionBuilderWithGeoTargeting() {
+        let geo = AuctionGeoTargeting(location: "US")
+        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile")
+            .with(geoTargeting: geo)
+        let auction = builder.build()
+        XCTAssertEqual(auction.geoTargeting?.location, "US")
+    }
+
+    // MARK: - ViewModel edge cases
+
+    func testViewModelWinnerWithNoAsset() async throws {
+        let winner = Winner(rank: 1, asset: nil, type: "type", id: "id", resolvedBidId: "bid")
+        let auctionResult = AuctionResult(resultType: "result_type", winners: [winner], error: false)
+        let auctionResponse = AuctionResponse(results: [auctionResult])
+
+        let mockTopsort = MockTopsort(executeAuctionsMockResponse: auctionResponse)
+        var config = Configuration(apiKey: "test_api_key")
+        config.url = "test_url"
+        try Topsort.shared.configure(config)
+
+        let vm = await TopsortBanner.ViewModel()
+        let auction = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile").build()
+        await vm.executeAuctions(auction: auction, topsort: mockTopsort, onError: nil, onNoWinners: nil)
+
+        await MainActor.run {
+            XCTAssertNil(vm.urlString, "No asset means no URL")
+            XCTAssertNil(vm.resolvedBidId, "No asset means resolvedBidId stays nil")
+        }
+    }
+
+    func testViewModelEmptyResults() async throws {
+        let auctionResponse = AuctionResponse(results: [])
+        let mockTopsort = MockTopsort(executeAuctionsMockResponse: auctionResponse)
+        var config = Configuration(apiKey: "test_api_key")
+        config.url = "test_url"
+        try Topsort.shared.configure(config)
+
+        let vm = await TopsortBanner.ViewModel()
+        let auction = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile").build()
+        await vm.executeAuctions(auction: auction, topsort: mockTopsort, onError: nil, onNoWinners: nil)
+
+        await MainActor.run {
+            XCTAssertFalse(vm.loading)
+            XCTAssertNil(vm.resolvedBidId)
+        }
+    }
 }
 
 private class FailingMockTopsort: TopsortProtocol {
