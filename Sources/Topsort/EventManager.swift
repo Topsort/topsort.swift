@@ -87,6 +87,8 @@ class EventManager {
 
     private init() {
         client = HTTPClient(apiKey: nil)
+        __eventQueue.deferPersistence = true
+        __pendingEvents.deferPersistence = true
         periodicEvent = PeriodicEvent(interval: 30, action: { EventManager.shared.handlePeriodicEvent() })
         periodicEvent.start()
     }
@@ -128,6 +130,15 @@ class EventManager {
         serialQueue.async {
             self.send()
             self.retry()
+        }
+    }
+
+    func flushAndPersist() {
+        serialQueue.async {
+            self.send()
+            self.retry()
+            self.__eventQueue.persistIfDirty()
+            self.__pendingEvents.persistIfDirty()
         }
     }
 
