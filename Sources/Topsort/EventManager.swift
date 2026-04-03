@@ -85,9 +85,15 @@ class EventManager {
     var flushAt: Int = 30
     var flushInterval: TimeInterval = 30
     private var lifecycleObserver: LifecycleObserver?
+    #if canImport(Network)
+        var networkMonitor: NetworkMonitoring
+    #endif
 
     private init() {
         client = HTTPClient(apiKey: nil)
+        #if canImport(Network)
+            networkMonitor = NetworkMonitor()
+        #endif
         __eventQueue.deferPersistence = true
         __pendingEvents.deferPersistence = true
         periodicEvent = PeriodicEvent(interval: 30, action: { EventManager.shared.handlePeriodicEvent() })
@@ -102,6 +108,12 @@ class EventManager {
                 self?.flushAndPersist()
             }
         )
+        #if canImport(Network)
+            networkMonitor.onConnectivityRestored = { [weak self] in
+                self?.flush()
+            }
+            networkMonitor.start()
+        #endif
     }
 
     var url: URL = EVENTS_TOPSORT_URL
@@ -155,7 +167,12 @@ class EventManager {
 
     /// Must be called on serialQueue
     private func performSend() {
-        // TODO: check network connectivity
+        #if canImport(Network)
+            guard networkMonitor.isConnected else {
+                Logger.debug("Offline — deferring event send")
+                return
+            }
+        #endif
         if inProgress.count > MAX_IN_PROGRESS {
             return
         }
@@ -202,7 +219,12 @@ class EventManager {
 
     /// Must be called on serialQueue
     private func performRetry() {
-        // TODO: check network connectivity - NWPathMonitor
+        #if canImport(Network)
+            guard networkMonitor.isConnected else {
+                Logger.debug("Offline — deferring event retry")
+                return
+            }
+        #endif
         if inProgress.count > MAX_IN_PROGRESS {
             return
         }
