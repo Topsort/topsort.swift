@@ -100,7 +100,10 @@ public struct Auction: Codable, Equatable {
     let opaqueUserId: String?
 
     /**
-     * Unique identifier for the placement where the auction result will be displayed.
+     * Experiment bucket identifier (1-8) used for A/B testing in conjunction
+     * with the Topsort Data Science team. Assigns the auction request to one
+     * of up to 8 buckets to enable controlled experiments on auction behavior.
+     * Not related to banner slot placement — use `slotId` for that.
      */
     let placementId: Int?
 
