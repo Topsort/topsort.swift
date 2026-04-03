@@ -4,6 +4,7 @@ import XCTest
 
 public class MockTopsort: TopsortProtocol {
     public var opaqueUserId: String = "mocked-opaque-user-id"
+    public var isConfigured: Bool = true
     public var executeAuctionsMockResponse: AuctionResponse
 
     public init(executeAuctionsMockResponse: AuctionResponse) {
