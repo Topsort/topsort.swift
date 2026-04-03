@@ -100,8 +100,8 @@ class EventManager {
         periodicEvent.start()
         lifecycleObserver = LifecycleObserver(
             onBackground: { [weak self] in
-                Logger.debug("App entering background — flushing events")
-                self?.flush()
+                Logger.debug("App entering background — flushing and persisting events")
+                self?.flushAndPersist()
             },
             onTerminate: { [weak self] in
                 Logger.debug("App terminating — flushing and persisting events")
@@ -156,7 +156,10 @@ class EventManager {
         }
     }
 
+    /// Synchronously flushes events and persists state to disk.
+    /// Must NOT be called from within serialQueue — will deadlock.
     func flushAndPersist() {
+        dispatchPrecondition(condition: .notOnQueue(serialQueue))
         serialQueue.sync {
             self.performSend()
             self.performRetry()
