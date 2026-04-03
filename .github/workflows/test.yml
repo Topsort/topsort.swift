@@ -10,5 +10,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: swift build
-      - name: Run Swift test
-        run: swift test
+      - name: Run Swift test with coverage
+        run: swift test --enable-code-coverage
+      - name: Export coverage
+        run: |
+          BIN=$(swift build --show-bin-path)
+          XCTEST="$BIN/TopsortPackageTests.xctest/Contents/MacOS/TopsortPackageTests"
+          PROFDATA=$(find .build -name 'default.profdata' -type f)
+          xcrun llvm-cov export "$XCTEST" -instr-profile="$PROFDATA" -format=lcov > coverage.lcov
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.lcov
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: Topsort/topsort.swift
+          fail_ci_if_error: false
