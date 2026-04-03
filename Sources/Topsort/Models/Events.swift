@@ -107,19 +107,19 @@ public struct Event: Codable {
 
     let placement: Placement?
 
-    public init(entity: Entity, occurredAt: Date, placement: Placement? = nil) {
+    public init(entity: Entity, occurredAt: Date, opaqueUserId: String = Topsort.shared.opaqueUserId, placement: Placement? = nil) {
         self.entity = entity
         self.occurredAt = occurredAt
-        opaqueUserId = Topsort.shared.opaqueUserId
+        self.opaqueUserId = opaqueUserId
         resolvedBidId = nil
         self.placement = placement
         id = UUID()
     }
 
-    public init(resolvedBidId: String, occurredAt: Date, placement: Placement? = nil) {
+    public init(resolvedBidId: String, occurredAt: Date, opaqueUserId: String = Topsort.shared.opaqueUserId, placement: Placement? = nil) {
         entity = nil
         self.occurredAt = occurredAt
-        opaqueUserId = Topsort.shared.opaqueUserId
+        self.opaqueUserId = opaqueUserId
         self.resolvedBidId = resolvedBidId
         self.placement = placement
         id = UUID()
@@ -168,10 +168,10 @@ public struct PurchaseEvent: Codable {
      unique string that does not change if the event needs to be resent.
      */
     let id: UUID
-    public init(items: [PurchaseItem], occurredAt: Date) {
+    public init(items: [PurchaseItem], occurredAt: Date, opaqueUserId: String = Topsort.shared.opaqueUserId) {
         self.items = items
         self.occurredAt = occurredAt
-        opaqueUserId = Topsort.shared.opaqueUserId
+        self.opaqueUserId = opaqueUserId
         id = UUID()
     }
 }

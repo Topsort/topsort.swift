@@ -131,7 +131,7 @@ public struct TopsortBanner: View {
 
     private func buttonClicked() {
         if let rab = viewModel.resolvedBidId {
-            let event = Event(resolvedBidId: rab, occurredAt: Date.now)
+            let event = Event(resolvedBidId: rab, occurredAt: Date.now, opaqueUserId: topsort.opaqueUserId)
             topsort.track(click: event)
         }
         buttonClickedAction?(viewModel.response)
@@ -217,7 +217,7 @@ extension TopsortBanner {
             resolvedBidId = winner.resolvedBidId
             urlString = asset.url
 
-            let event = Event(resolvedBidId: winner.resolvedBidId, occurredAt: Date.now)
+            let event = Event(resolvedBidId: winner.resolvedBidId, occurredAt: Date.now, opaqueUserId: topsort.opaqueUserId)
             topsort.track(impression: event)
         }
     }
