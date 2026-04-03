@@ -24,10 +24,10 @@ extension [EventItem] {
             }
         }
         return Events(
-            impressions: impressions,
-            clicks: clicks,
-            purchases: purchases,
-            pageviews: pageviews
+            impressions: impressions.isEmpty ? nil : impressions,
+            clicks: clicks.isEmpty ? nil : clicks,
+            purchases: purchases.isEmpty ? nil : purchases,
+            pageviews: pageviews.isEmpty ? nil : pageviews
         )
     }
 }

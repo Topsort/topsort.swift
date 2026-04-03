@@ -73,18 +73,63 @@ public struct Entity: Codable {
 }
 
 /// Page context for pageview events and auction requests.
+/// Valid page types: "home", "category", "PDP", "search", "cart", "other".
 public struct Page: Codable {
-    /// The type of page (e.g. "category", "product", "search", "home").
-    let type: String
+    /// The type of page (e.g. "category", "product", "search", "home", "cart").
+    public let type: String
     /// An identifier for the page (required by the API).
-    let pageId: String
-    /// A value associated with the page (e.g. category name, search query).
-    let value: String?
+    public let pageId: String
+    /// A single value (e.g. category name, search query) or an array of values
+    /// (e.g. product IDs for cart pages). The API accepts either format under the `value` key.
+    public let value: PageValue?
 
     public init(type: String, pageId: String, value: String? = nil) {
         self.type = type
         self.pageId = pageId
-        self.value = value
+        self.value = value.map { .string($0) }
+    }
+
+    public init(type: String, pageId: String, values: [String]) {
+        self.type = type
+        self.pageId = pageId
+        value = .array(values)
+    }
+}
+
+/// A page value that can be either a single string or an array of strings.
+public enum PageValue: Codable {
+    case string(String)
+    case array([String])
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let s = try? container.decode(String.self) {
+            self = .string(s)
+        } else if let arr = try? container.decode([String].self) {
+            self = .array(arr)
+        } else {
+            throw DecodingError.typeMismatch(PageValue.self, .init(codingPath: decoder.codingPath, debugDescription: "Expected String or [String]"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case let .string(s): try container.encode(s)
+        case let .array(arr): try container.encode(arr)
+        }
+    }
+
+    /// Convenience: get the string value (nil if array).
+    public var stringValue: String? {
+        if case let .string(s) = self { return s }
+        return nil
+    }
+
+    /// Convenience: get the array value (nil if string).
+    public var arrayValue: [String]? {
+        if case let .array(arr) = self { return arr }
+        return nil
     }
 }
 
@@ -281,6 +326,13 @@ struct Events: Codable {
     let clicks: [Event]?
     let purchases: [PurchaseEvent]?
     let pageviews: [PageViewEvent]?
+
+    init(impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
+        self.impressions = impressions
+        self.clicks = clicks
+        self.purchases = purchases
+        self.pageviews = pageviews
+    }
 
     init(impressions: [Event], clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
         self.impressions = impressions
