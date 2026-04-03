@@ -102,14 +102,16 @@ class EventManager {
             }
             self.url = parsedURL
         }
-        if let flushAt = flushAt {
-            self.flushAt = flushAt
-        }
-        if let flushInterval = flushInterval {
-            self.flushInterval = flushInterval
-            periodicEvent.stop()
-            periodicEvent = PeriodicEvent(interval: flushInterval, action: { EventManager.shared.handlePeriodicEvent() })
-            periodicEvent.start()
+        serialQueue.sync {
+            if let flushAt = flushAt {
+                self.flushAt = flushAt
+            }
+            if let flushInterval = flushInterval {
+                self.flushInterval = flushInterval
+                self.periodicEvent.stop()
+                self.periodicEvent = PeriodicEvent(interval: flushInterval, action: { EventManager.shared.handlePeriodicEvent() })
+                self.periodicEvent.start()
+            }
         }
     }
 
