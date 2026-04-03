@@ -85,25 +85,25 @@ public struct BannerAuctionBuilder {
     }
 
     public func build() -> Auction {
-        return Auction(type: "banners", slots: 1, slotId: slotId, device: deviceType, products: products, category: category, searchQuery: searchQuery, geoTargeting: geoTargeting)
+        Auction(type: "banners", slots: 1, slotId: slotId, device: deviceType, products: products, category: category, searchQuery: searchQuery, geoTargeting: geoTargeting)
     }
 }
 
 extension BannerAuctionBuilder: With {
     public func with(products value: AuctionProducts?) -> Self {
-        return with(path: \.products, to: value)
+        with(path: \.products, to: value)
     }
 
     public func with(category value: AuctionCategory?) -> Self {
-        return with(path: \.category, to: value)
+        with(path: \.category, to: value)
     }
 
     public func with(searchQuery value: String?) -> Self {
-        return with(path: \.searchQuery, to: value)
+        with(path: \.searchQuery, to: value)
     }
 
     public func with(geoTargeting value: AuctionGeoTargeting?) -> Self {
-        return with(path: \.geoTargeting, to: value)
+        with(path: \.geoTargeting, to: value)
     }
 }
 
@@ -147,52 +147,52 @@ public struct TopsortBanner: View {
             if viewModel.loading {
                 ProgressView()
             } else {
-                if let image_url = self.viewModel.urlString,
+                if let image_url = viewModel.urlString,
                    let url = URL(string: image_url)
                 {
-                    let capturedBidId = self.viewModel.resolvedBidId
+                    let capturedBidId = viewModel.resolvedBidId
                     RemoteImage(
                         url: url,
-                        contentMode: self.contentMode,
+                        contentMode: contentMode,
                         onSuccess: {
                             if let bidId = capturedBidId {
-                                self.trackImpression(resolvedBidId: bidId)
+                                trackImpression(resolvedBidId: bidId)
                             }
-                            self.onImageLoad?()
+                            onImageLoad?()
                         },
-                        onFailure: { error in self.onError?(.unknown(error: error)) }
+                        onFailure: { error in onError?(.unknown(error: error)) }
                     )
                 }
             }
         }
         .onTapGesture {
-            self.buttonClicked()
+            buttonClicked()
         }
         .task(id: auction) {
-            await self.viewModel.executeAuctions(auction: self.auction, topsort: self.topsort, onError: self.onError, onNoWinners: self.onNoWinners)
+            await viewModel.executeAuctions(auction: auction, topsort: topsort, onError: onError, onNoWinners: onNoWinners)
         }
     }
 }
 
 extension TopsortBanner: With {
     public func buttonClickedAction(_ value: ButtonClicked?) -> Self {
-        return with(path: \.buttonClickedAction, to: value)
+        with(path: \.buttonClickedAction, to: value)
     }
 
     public func onError(_ value: OnError?) -> Self {
-        return with(path: \.onError, to: value)
+        with(path: \.onError, to: value)
     }
 
     public func onImageLoad(_ value: UnitAction?) -> Self {
-        return with(path: \.onImageLoad, to: value)
+        with(path: \.onImageLoad, to: value)
     }
 
     public func contentMode(_ value: ContentMode) -> Self {
-        return with(path: \.contentMode, to: value)
+        with(path: \.contentMode, to: value)
     }
 
     public func onNoWinners(_ value: UnitAction?) -> Self {
-        return with(path: \.onNoWinners, to: value)
+        with(path: \.onNoWinners, to: value)
     }
 }
 

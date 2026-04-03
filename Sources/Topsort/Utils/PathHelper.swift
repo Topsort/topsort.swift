@@ -12,7 +12,7 @@ class PathHelper {
     }()
 
     static func path(for file: String) -> String {
-        return "\(storagePath)/\(file)"
+        "\(storagePath)/\(file)"
     }
 
     private static func migrateFromDocuments(to newDir: String) {
