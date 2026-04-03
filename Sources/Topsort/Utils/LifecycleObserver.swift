@@ -8,10 +8,12 @@ import Foundation
 
 class LifecycleObserver {
     private let onBackground: () -> Void
+    private let onTerminate: () -> Void
     private var observers: [Any] = []
 
-    init(onBackground: @escaping () -> Void) {
+    init(onBackground: @escaping () -> Void, onTerminate: @escaping () -> Void) {
         self.onBackground = onBackground
+        self.onTerminate = onTerminate
         registerNotifications()
     }
 
@@ -27,7 +29,7 @@ class LifecycleObserver {
                 NotificationCenter.default.addObserver(
                     forName: UIApplication.willTerminateNotification,
                     object: nil, queue: .main
-                ) { [weak self] _ in self?.onBackground() }
+                ) { [weak self] _ in self?.onTerminate() }
             )
         #elseif canImport(AppKit)
             observers.append(
@@ -40,7 +42,7 @@ class LifecycleObserver {
                 NotificationCenter.default.addObserver(
                     forName: NSApplication.willTerminateNotification,
                     object: nil, queue: .main
-                ) { [weak self] _ in self?.onBackground() }
+                ) { [weak self] _ in self?.onTerminate() }
             )
         #endif
     }
