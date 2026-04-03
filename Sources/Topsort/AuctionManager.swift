@@ -35,11 +35,11 @@ class AuctionManager {
 
     func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
         if auctions.count > MAX_AUCTIONS || auctions.count < MIN_AUCTIONS {
-            print("Invalid number of auctions: \(auctions.count), must be between \(MIN_AUCTIONS) and \(MAX_AUCTIONS)")
+            Logger.error("Invalid number of auctions: \(auctions.count), must be between \(MIN_AUCTIONS) and \(MAX_AUCTIONS)")
             throw AuctionError.invalidNumberAuctions(count: auctions.count)
         }
         guard let auctionsData = try? JSONEncoder().encode(["auctions": auctions]) else {
-            print("failed to serialize auctions: \(auctions)")
+            Logger.error("Failed to serialize auctions: \(auctions)")
             throw AuctionError.serializationError
         }
 
@@ -62,7 +62,7 @@ class AuctionManager {
             }
             return try decodeAuctionResponse(data: data)
         case let .failure(error):
-            print("failed to send auctions: \(error)")
+            Logger.error("Failed to send auctions: \(error)")
             throw .http(error: error)
         }
     }

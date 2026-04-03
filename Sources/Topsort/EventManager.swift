@@ -117,7 +117,7 @@ class EventManager {
             }
             let events = self.eventQueue.toEvents()
             guard let data = try? JSONEncoder().encode(events) else {
-                print("failed to serialize events: \(events)")
+                Logger.error("Failed to serialize events: \(events)")
                 return
             }
             let id = UUID()
@@ -144,11 +144,11 @@ class EventManager {
                         pendingEvents.retries += 1
                         pendingEvents.lastRetry = Date()
                         self.pendingEvents[id] = pendingEvents
-                        print("failed to send events, backoff retry: \(error)")
+                        Logger.warning("Failed to send events, will retry: \(error)")
                     }
                 } else {
                     self.pendingEvents.removeValue(forKey: id)
-                    print("failed to send events: \(error)")
+                    Logger.error("Failed to send events (non-retriable): \(error)")
                 }
             }
         }

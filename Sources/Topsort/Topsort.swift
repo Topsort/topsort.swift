@@ -32,6 +32,7 @@ public class Topsort: TopsortProtocol {
     }
 
     public func configure(_ configuration: Configuration) throws(ConfigurationError) {
+        Logger.logLevel = configuration.logLevel
         try EventManager.shared.configure(apiKey: configuration.apiKey, url: configuration.url)
         try AuctionManager.shared.configure(apiKey: configuration.apiKey, url: configuration.url)
         if let timeout = configuration.auctionsTimeout {
@@ -50,7 +51,7 @@ public class Topsort: TopsortProtocol {
 
     public func track(impression event: Event) {
         guard isConfigured else {
-            print("[Topsort] Warning: track(impression:) called before configure(). Event dropped.")
+            Logger.warning("track(impression:) called before configure(). Event dropped.")
             return
         }
         EventManager.shared.push(event: .impression(event))
@@ -58,7 +59,7 @@ public class Topsort: TopsortProtocol {
 
     public func track(click event: Event) {
         guard isConfigured else {
-            print("[Topsort] Warning: track(click:) called before configure(). Event dropped.")
+            Logger.warning("track(click:) called before configure(). Event dropped.")
             return
         }
         EventManager.shared.push(event: .click(event))
@@ -66,7 +67,7 @@ public class Topsort: TopsortProtocol {
 
     public func track(purchase event: PurchaseEvent) {
         guard isConfigured else {
-            print("[Topsort] Warning: track(purchase:) called before configure(). Event dropped.")
+            Logger.warning("track(purchase:) called before configure(). Event dropped.")
             return
         }
         EventManager.shared.push(event: .purchase(event))
