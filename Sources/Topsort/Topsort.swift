@@ -2,6 +2,7 @@ import Foundation
 
 public protocol TopsortProtocol {
     var opaqueUserId: String { get }
+    var isConfigured: Bool { get }
     func set(opaqueUserId: String?)
     func configure(apiKey: String, url: String?, auctionsTimeout: TimeInterval?) throws
     func track(impression event: Event)
@@ -12,6 +13,7 @@ public protocol TopsortProtocol {
 
 public class Topsort: TopsortProtocol {
     public static let shared = Topsort()
+    public private(set) var isConfigured = false
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.opaque-user-id.plist"))
     private var _opaqueUserId: String?
     public var opaqueUserId: String {
@@ -35,17 +37,30 @@ public class Topsort: TopsortProtocol {
         if let timeout = auctionsTimeout {
             AuctionManager.shared.timeoutInterval = timeout
         }
+        isConfigured = true
     }
 
     public func track(impression event: Event) {
+        guard isConfigured else {
+            print("[Topsort] Warning: track(impression:) called before configure(). Event dropped.")
+            return
+        }
         EventManager.shared.push(event: .impression(event))
     }
 
     public func track(click event: Event) {
+        guard isConfigured else {
+            print("[Topsort] Warning: track(click:) called before configure(). Event dropped.")
+            return
+        }
         EventManager.shared.push(event: .click(event))
     }
 
     public func track(purchase event: PurchaseEvent) {
+        guard isConfigured else {
+            print("[Topsort] Warning: track(purchase:) called before configure(). Event dropped.")
+            return
+        }
         EventManager.shared.push(event: .purchase(event))
     }
 
@@ -54,6 +69,9 @@ public class Topsort: TopsortProtocol {
     }
 
     public func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
+        guard isConfigured else {
+            throw .notConfigured
+        }
         return try await AuctionManager.shared.executeAuctions(auctions: auctions)
     }
 }

@@ -10,6 +10,7 @@ public enum AuctionError: Error {
     case serializationError
     case deserializationError(error: Error, data: Data)
     case emptyResponse
+    case notConfigured
 }
 
 class AuctionManager {

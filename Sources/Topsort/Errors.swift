@@ -2,11 +2,14 @@ import Foundation
 
 public enum ConfigurationError: LocalizedError {
     case invalidURL(String)
+    case notConfigured
 
     public var errorDescription: String? {
         switch self {
         case let .invalidURL(url):
             return "Invalid Topsort API URL: \(url)"
+        case .notConfigured:
+            return "Topsort SDK is not configured. Call Topsort.shared.configure(apiKey:) before use."
         }
     }
 }
