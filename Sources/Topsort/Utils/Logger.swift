@@ -1,7 +1,12 @@
 import Foundation
 
 enum Logger {
-    static var logLevel: LogLevel = .error
+    private static let lock = NSLock()
+    private static var _logLevel: LogLevel = .error
+    static var logLevel: LogLevel {
+        get { lock.withLock { _logLevel } }
+        set { lock.withLock { _logLevel = newValue } }
+    }
 
     static func error(_ message: @autoclosure () -> String) {
         guard logLevel >= .error else { return }
