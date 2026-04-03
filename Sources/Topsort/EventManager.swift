@@ -87,8 +87,8 @@ class EventManager {
         periodicEvent.start()
     }
 
-    private var url: URL = EVENTS_TOPSORT_URL
-    private var client: HTTPClient
+    var url: URL = EVENTS_TOPSORT_URL
+    var client: HTTPClient
     func configure(apiKey: String, url: String?) throws(ConfigurationError) {
         client.apiKey = apiKey
         if let url = url {

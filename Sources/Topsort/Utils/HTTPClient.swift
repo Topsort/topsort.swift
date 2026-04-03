@@ -61,19 +61,6 @@ class HTTPClient {
         }
         return data
     }
-}
-
-extension HTTPClient {
-    private func newRequest(url: URL, method: String) -> URLRequest {
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
-        request.httpMethod = method
-        request.addValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
-        request.addValue("analytics-swift/\(__analytics_version)", forHTTPHeaderField: "User-Agent")
-        if let apiKey = apiKey {
-            request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        }
-        return request
-    }
 
     func post(url: URL, data: Data, callback: @escaping (Result<Data?, HTTPClientError>) -> Void) {
         var request = newRequest(url: url, method: "POST")
@@ -94,5 +81,16 @@ extension HTTPClient {
             callback(.success(data))
         }
         task.resume()
+    }
+
+    private func newRequest(url: URL, method: String) -> URLRequest {
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
+        request.httpMethod = method
+        request.addValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+        request.addValue("analytics-swift/\(__analytics_version)", forHTTPHeaderField: "User-Agent")
+        if let apiKey = apiKey {
+            request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        return request
     }
 }
