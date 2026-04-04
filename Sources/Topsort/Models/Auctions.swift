@@ -27,11 +27,13 @@ public struct AuctionCategory: Codable, Equatable {
 
     /**
      * An array of disjunctions.
-     * In order to participate in an auction, a bid product must belong to at least one of the categories for each of the disjunctions provided in the auction request.
+     * In order to participate in an auction, a bid product must belong to at least one of the categories
+     * for each of the disjunctions provided in the auction request.
+     * Each disjunction is an array of category IDs (max 5 elements per disjunction).
      */
-    let disjunctions: [String]?
+    let disjunctions: [[String]]?
 
-    public init(id: String? = nil, ids: [String]? = nil, disjunctions: [String]? = nil) {
+    public init(id: String? = nil, ids: [String]? = nil, disjunctions: [[String]]? = nil) {
         self.id = id
         self.ids = ids
         self.disjunctions = disjunctions
