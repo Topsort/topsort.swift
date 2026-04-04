@@ -10,18 +10,14 @@ public class MockTopsort: TopsortProtocol {
     public var trackedImpressions: [Event] = []
     public var trackedClicks: [Event] = []
     public var trackedPurchases: [PurchaseEvent] = []
+    public var trackedPageviews: [PageViewEvent] = []
 
     public init(executeAuctionsMockResponse: AuctionResponse) {
         self.executeAuctionsMockResponse = executeAuctionsMockResponse
     }
 
-    public func set(opaqueUserId _: String?) {
-        // Mock implementation
-    }
-
-    public func configure(_: Configuration) throws {
-        // Mock implementation
-    }
+    public func set(opaqueUserId _: String?) {}
+    public func configure(_: Configuration) throws {}
 
     public func track(impression event: Event) {
         trackedImpressions.append(event)
@@ -35,9 +31,11 @@ public class MockTopsort: TopsortProtocol {
         trackedPurchases.append(event)
     }
 
-    public func flush() {
-        // Mock implementation
+    public func track(pageview event: PageViewEvent) {
+        trackedPageviews.append(event)
     }
+
+    public func flush() {}
 
     public func executeAuctions(auctions _: [Auction]) async throws(AuctionError) -> AuctionResponse {
         executeAuctionsMockResponse

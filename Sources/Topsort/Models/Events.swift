@@ -72,6 +72,67 @@ public struct Entity: Codable {
     }
 }
 
+/// Page context for pageview events and auction requests.
+/// Valid page types: "home", "category", "PDP", "search", "cart", "other".
+public struct Page: Codable {
+    /// The type of page (e.g. "category", "product", "search", "home", "cart").
+    public let type: String
+    /// An identifier for the page (required by the API).
+    public let pageId: String
+    /// A single value (e.g. category name, search query) or an array of values
+    /// (e.g. product IDs for cart pages). The API accepts either format under the `value` key.
+    public let value: PageValue?
+
+    public init(type: String, pageId: String, value: String? = nil) {
+        self.type = type
+        self.pageId = pageId
+        self.value = value.map { .string($0) }
+    }
+
+    public init(type: String, pageId: String, values: [String]) {
+        self.type = type
+        self.pageId = pageId
+        value = .array(values)
+    }
+}
+
+/// A page value that can be either a single string or an array of strings.
+public enum PageValue: Codable {
+    case string(String)
+    case array([String])
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let s = try? container.decode(String.self) {
+            self = .string(s)
+        } else if let arr = try? container.decode([String].self) {
+            self = .array(arr)
+        } else {
+            throw DecodingError.typeMismatch(PageValue.self, .init(codingPath: decoder.codingPath, debugDescription: "Expected String or [String]"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case let .string(s): try container.encode(s)
+        case let .array(arr): try container.encode(arr)
+        }
+    }
+
+    /// Convenience: get the string value (nil if array).
+    public var stringValue: String? {
+        if case let .string(s) = self { return s }
+        return nil
+    }
+
+    /// Convenience: get the array value (nil if string).
+    public var arrayValue: [String]? {
+        if case let .array(arr) = self { return arr }
+        return nil
+    }
+}
+
 public struct Event: Codable {
     /**
      The entity associated with the promotable over which the interaction occurred.
@@ -88,15 +149,12 @@ public struct Event: Codable {
     /**
      The opaque user ID allows correlating user activity, such as Impressions, Clicks and Purchases, whether or not they
      are actually logged in. It must be long lived (at least a year) so that Topsort can attribute purchases.
-
-     If your users are always logged in you may use a hash of your customer ID. If your users may interact with your app or site while logged out we recommend generating a random identifier (UUIDv4) on first load and store it on local storage (cookie, local storage, etc) and let it live for at least a year.
      */
     let opaqueUserId: String
 
     /**
      The marketplace's unique ID for the impression. This field ensures the event reporting is idempotent in case there is
-     a network issue and the request is retried. If there is no impression model on the marketplace side, generate a unique
-     string that does not change if the event is resent.
+     a network issue and the request is retried.
      */
     let id: UUID
 
@@ -107,21 +165,66 @@ public struct Event: Codable {
 
     let placement: Placement?
 
-    public init(entity: Entity, occurredAt: Date, opaqueUserId: String = Topsort.shared.opaqueUserId, placement: Placement? = nil) {
+    /// Page context for the event.
+    let page: Page?
+
+    /// Device type: "desktop" or "mobile".
+    let deviceType: String?
+
+    /// Channel: "onsite", "offsite", or "instore".
+    let channel: String?
+
+    /// Additional entity for halo attribution. Requires resolvedBidId to be set.
+    let additionalAttribution: Entity?
+
+    /// Click type: "product", "like", or "add-to-cart". Only applicable for click events.
+    let clickType: String?
+
+    public init(
+        entity: Entity,
+        occurredAt: Date,
+        opaqueUserId: String = Topsort.shared.opaqueUserId,
+        placement: Placement? = nil,
+        page: Page? = nil,
+        deviceType: String? = nil,
+        channel: String? = nil,
+        additionalAttribution: Entity? = nil,
+        clickType: String? = nil
+    ) {
         self.entity = entity
         self.occurredAt = occurredAt
         self.opaqueUserId = opaqueUserId
         resolvedBidId = nil
         self.placement = placement
+        self.page = page
+        self.deviceType = deviceType
+        self.channel = channel
+        self.additionalAttribution = additionalAttribution
+        self.clickType = clickType
         id = UUID()
     }
 
-    public init(resolvedBidId: String, occurredAt: Date, opaqueUserId: String = Topsort.shared.opaqueUserId, placement: Placement? = nil) {
+    public init(
+        resolvedBidId: String,
+        occurredAt: Date,
+        opaqueUserId: String = Topsort.shared.opaqueUserId,
+        placement: Placement? = nil,
+        page: Page? = nil,
+        deviceType: String? = nil,
+        channel: String? = nil,
+        additionalAttribution: Entity? = nil,
+        clickType: String? = nil
+    ) {
         entity = nil
         self.occurredAt = occurredAt
         self.opaqueUserId = opaqueUserId
         self.resolvedBidId = resolvedBidId
         self.placement = placement
+        self.page = page
+        self.deviceType = deviceType
+        self.channel = channel
+        self.additionalAttribution = additionalAttribution
+        self.clickType = clickType
         id = UUID()
     }
 }
@@ -136,10 +239,14 @@ public struct PurchaseItem: Codable {
     /// The price of a single item in the marketplace currency.
     let unitPrice: Double
 
-    public init(productId: String, unitPrice: Double, quantity: Int? = nil) {
+    /// The vendor ID for halo attribution.
+    let vendorId: String?
+
+    public init(productId: String, unitPrice: Double, quantity: Int? = nil, vendorId: String? = nil) {
         self.productId = productId
         self.quantity = quantity
         self.unitPrice = unitPrice
+        self.vendorId = vendorId
     }
 }
 
@@ -151,27 +258,65 @@ public struct PurchaseEvent: Codable {
     var occurredAt: Date
 
     /**
-     The opaque user ID allows correlating user activity, such as Impressions, Clicks and Purchases, whether or not they
-     are actually logged in. It must be long lived (at least a year) so that Topsort can attribute purchases.
-
-     If your users are always logged in you may use a hash of your customer ID. If your users may interact with your app or
-     site while logged out we recommend generating a random identifier (UUIDv4) on first load and store it on local storage
-     (cookie, local storage, etc) and let it live for at least a year.
+     The opaque user ID allows correlating user activity.
      */
     let opaqueUserId: String
 
     let items: [PurchaseItem]
 
     /**
-     The marketplace unique ID for the order. This field ensures the event reporting is idempotent in case there is a
-     network issue and the request is retried. If there is no unique ID for orders on the marketplace side, generate a
-     unique string that does not change if the event needs to be resent.
+     The marketplace unique ID for the order. Ensures idempotent event reporting.
      */
     let id: UUID
-    public init(items: [PurchaseItem], occurredAt: Date, opaqueUserId: String = Topsort.shared.opaqueUserId) {
+
+    /// Device type: "desktop" or "mobile".
+    let deviceType: String?
+
+    /// Channel: "onsite", "offsite", or "instore".
+    let channel: String?
+
+    public init(
+        items: [PurchaseItem],
+        occurredAt: Date,
+        opaqueUserId: String = Topsort.shared.opaqueUserId,
+        deviceType: String? = nil,
+        channel: String? = nil
+    ) {
         self.items = items
         self.occurredAt = occurredAt
         self.opaqueUserId = opaqueUserId
+        self.deviceType = deviceType
+        self.channel = channel
+        id = UUID()
+    }
+}
+
+/// A page view event for tracking navigation.
+public struct PageViewEvent: Codable {
+    @TSDateValue
+    var occurredAt: Date
+    let opaqueUserId: String
+    let id: UUID
+    let page: Page
+
+    /// Device type: "desktop" or "mobile".
+    let deviceType: String?
+
+    /// Channel: "onsite", "offsite", or "instore".
+    let channel: String?
+
+    public init(
+        page: Page,
+        occurredAt: Date,
+        opaqueUserId: String = Topsort.shared.opaqueUserId,
+        deviceType: String? = nil,
+        channel: String? = nil
+    ) {
+        self.page = page
+        self.occurredAt = occurredAt
+        self.opaqueUserId = opaqueUserId
+        self.deviceType = deviceType
+        self.channel = channel
         id = UUID()
     }
 }
@@ -180,22 +325,40 @@ struct Events: Codable {
     let impressions: [Event]?
     let clicks: [Event]?
     let purchases: [PurchaseEvent]?
+    let pageviews: [PageViewEvent]?
 
-    init(impressions: [Event], clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil) {
+    init(impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
+        self.pageviews = pageviews
     }
 
-    init(clicks: [Event], impressions: [Event]? = nil, purchases: [PurchaseEvent]? = nil) {
+    init(impressions: [Event], clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
+        self.pageviews = pageviews
     }
 
-    init(purchases: [PurchaseEvent], impressions: [Event]? = nil, clicks: [Event]? = nil) {
+    init(clicks: [Event], impressions: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
+        self.pageviews = pageviews
+    }
+
+    init(purchases: [PurchaseEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, pageviews: [PageViewEvent]? = nil) {
+        self.impressions = impressions
+        self.clicks = clicks
+        self.purchases = purchases
+        self.pageviews = pageviews
+    }
+
+    init(pageviews: [PageViewEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil) {
+        self.impressions = impressions
+        self.clicks = clicks
+        self.purchases = purchases
+        self.pageviews = pageviews
     }
 }

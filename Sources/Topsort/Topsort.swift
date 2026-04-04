@@ -8,8 +8,14 @@ public protocol TopsortProtocol {
     func track(impression event: Event)
     func track(click event: Event)
     func track(purchase event: PurchaseEvent)
+    func track(pageview event: PageViewEvent)
     func flush()
     func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse
+}
+
+/// Default implementation for backward compatibility with existing conformers.
+public extension TopsortProtocol {
+    func track(pageview _: PageViewEvent) {}
 }
 
 public class Topsort: TopsortProtocol {
@@ -77,6 +83,14 @@ public class Topsort: TopsortProtocol {
             return
         }
         EventManager.shared.push(event: .purchase(event))
+    }
+
+    public func track(pageview event: PageViewEvent) {
+        guard isConfigured else {
+            Logger.warning("track(pageview:) called before configure(). Event dropped.")
+            return
+        }
+        EventManager.shared.push(event: .pageview(event))
     }
 
     public func flush() {
