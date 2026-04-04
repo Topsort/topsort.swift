@@ -63,9 +63,8 @@ public struct AuctionProducts: Codable, Equatable {
 public struct Auction: Codable, Equatable {
     /**
      * Discriminator for the type of auction.
-     * Could be one of the following values:
-     * - "listings"
-     * - "banner"
+     * - "listings" — Sponsored listings auction
+     * - "banners" — Banner ad auction
      */
     let type: String
 
@@ -76,6 +75,7 @@ public struct Auction: Codable, Equatable {
 
     /**
      * The ID of the banner placement for which this auction will be run for.
+     * Required for banner auctions.
      */
     let slotId: String?
 
@@ -94,6 +94,19 @@ public struct Auction: Codable, Equatable {
     let searchQuery: String?
     let geoTargeting: AuctionGeoTargeting?
 
+    /**
+     * An opaque user identifier for auction targeting context.
+     */
+    let opaqueUserId: String?
+
+    /**
+     * Experiment bucket identifier (1-8) used for A/B testing in conjunction
+     * with the Topsort Data Science team. Assigns the auction request to one
+     * of up to 8 buckets to enable controlled experiments on auction behavior.
+     * Not related to banner slot placement — use `slotId` for that.
+     */
+    let placementId: Int?
+
     public init(
         type: String,
         slots: Int,
@@ -102,7 +115,9 @@ public struct Auction: Codable, Equatable {
         products: AuctionProducts? = nil,
         category: AuctionCategory? = nil,
         searchQuery: String? = nil,
-        geoTargeting: AuctionGeoTargeting? = nil
+        geoTargeting: AuctionGeoTargeting? = nil,
+        opaqueUserId: String? = nil,
+        placementId: Int? = nil
     ) {
         self.type = type
         self.slots = slots
@@ -112,6 +127,8 @@ public struct Auction: Codable, Equatable {
         self.searchQuery = searchQuery
         self.category = category
         self.products = products
+        self.opaqueUserId = opaqueUserId
+        self.placementId = placementId
     }
 }
 
@@ -119,6 +136,48 @@ public struct Auction: Codable, Equatable {
 
 public struct Asset: Codable {
     public let url: String
+
+    /// Flexible content fields for banner templates.
+    /// Keys and values vary per marketplace configuration.
+    /// The API schema allows arbitrary JSON values (additionalProperties: true),
+    /// so non-string values are converted to their string representation.
+    public let content: [String: String]?
+
+    public init(url: String, content: [String: String]? = nil) {
+        self.url = url
+        self.content = content
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        url = try container.decode(String.self, forKey: .url)
+        // Lenient decoding: skip non-string values instead of crashing
+        if let raw = try? container.decodeIfPresent([String: LenientStringValue].self, forKey: .content) {
+            content = raw.compactMapValues(\.value)
+        } else {
+            content = nil
+        }
+    }
+}
+
+/// Decodes any JSON primitive as a String, returning nil for non-decodable values.
+private struct LenientStringValue: Decodable {
+    let value: String?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let s = try? container.decode(String.self) {
+            value = s
+        } else if let i = try? container.decode(Int.self) {
+            value = String(i)
+        } else if let d = try? container.decode(Double.self) {
+            value = String(d)
+        } else if let b = try? container.decode(Bool.self) {
+            value = String(b)
+        } else {
+            value = nil
+        }
+    }
 }
 
 public struct Winner: Codable {
@@ -127,6 +186,7 @@ public struct Winner: Codable {
     public let type: String
     public let id: String
     public let resolvedBidId: String
+    public let campaignId: String?
 }
 
 public struct AuctionResult: Codable {
