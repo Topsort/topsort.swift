@@ -18,10 +18,3 @@ jobs:
           XCTEST="$BIN/TopsortPackageTests.xctest/Contents/MacOS/TopsortPackageTests"
           PROFDATA=$(find .build -name 'default.profdata' -type f)
           xcrun llvm-cov export "$XCTEST" -instr-profile="$PROFDATA" -format=lcov > coverage.lcov
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: coverage.lcov
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: Topsort/topsort.swift
-          fail_ci_if_error: false
