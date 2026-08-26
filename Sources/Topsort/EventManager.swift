@@ -49,6 +49,12 @@ struct PendingEvents: Codable {
 
 private let MAX_IN_PROGRESS = 10
 let MAX_RETRIES = 50
+/// Resource bound on the queue. Events are dropped oldest-first past this, rather than by
+/// age: how long an event stays attributable is a server-side decision the client cannot know.
+let MAX_QUEUED_EVENTS = 5000
+/// Cap on a single POST body. Past this the request risks a 413, which is non-retriable and
+/// would discard the whole batch.
+let MAX_EVENTS_PER_BATCH = 500
 
 class EventManager {
     static let shared = EventManager()
@@ -148,6 +154,10 @@ class EventManager {
     func push(event: EventItem) {
         serialQueue.async {
             self.eventQueue.append(event)
+            if self.eventQueue.count > MAX_QUEUED_EVENTS {
+                self.eventQueue.removeFirst(self.eventQueue.count - MAX_QUEUED_EVENTS)
+                Logger.warning("Event queue is at capacity (\(MAX_QUEUED_EVENTS)); dropped the oldest event")
+            }
             if self.eventQueue.count >= self.flushAt {
                 self.performSend()
             }
@@ -185,26 +195,25 @@ class EventManager {
                 return
             }
         #endif
-        if inProgress.count > MAX_IN_PROGRESS {
-            return
-        }
-        if eventQueue.isEmpty {
-            return
-        }
-        let events = eventQueue.toEvents()
-        guard let data = try? JSONEncoder().encode(events) else {
-            Logger.error("Failed to serialize events: \(events)")
-            return
-        }
-        let id = UUID()
-        let pending = PendingEvents(id: id, data: data, createdAt: Date(), retries: 0, lastRetry: Date())
-        pendingEvents[id] = pending
-        inProgress.insert(id)
+        while !eventQueue.isEmpty, inProgress.count <= MAX_IN_PROGRESS {
+            let batch = Array(eventQueue.prefix(MAX_EVENTS_PER_BATCH))
+            eventQueue.removeFirst(batch.count)
+            let events = batch.toEvents()
+            guard let data = try? JSONEncoder().encode(events) else {
+                // Unencodable events can never be sent; keeping them would stall every
+                // later batch behind them.
+                Logger.error("Failed to serialize events, dropping \(batch.count): \(events)")
+                continue
+            }
+            let id = UUID()
+            let pending = PendingEvents(id: id, data: data, createdAt: Date(), retries: 0, lastRetry: Date())
+            pendingEvents[id] = pending
+            inProgress.insert(id)
 
-        client.post(url: url, data: data, callback: { r in
-            self.process_response(id: id, result: r)
-        })
-        eventQueue = []
+            client.post(url: url, data: data, callback: { r in
+                self.process_response(id: id, result: r)
+            })
+        }
     }
 
     private func process_response(id: UUID, result: Result<Data?, HTTPClientError>) {
