@@ -25,12 +25,25 @@ extension ErrorData {
 }
 
 extension HTTPClientError {
+    /// Whether the failure is worth another attempt.
+    ///
+    /// Client errors (4xx) are permanent: the same payload against the same endpoint will
+    /// fail identically every time, so retrying only burns the retry budget and keeps the
+    /// batch on disk. The exceptions are 408 and 429, which both explicitly invite a later
+    /// attempt. Server errors (5xx) and transport failures are treated as transient.
     func isRetriable() -> Bool {
         switch self {
         case .unknown:
             return true
         case let .statusCode(code, _):
-            return code != 400
+            switch code {
+            case 408, 429:
+                return true
+            case 400 ..< 500:
+                return false
+            default:
+                return true
+            }
         }
     }
 }

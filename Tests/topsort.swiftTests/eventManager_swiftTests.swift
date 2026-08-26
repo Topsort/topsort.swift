@@ -118,6 +118,38 @@ class EventManagerTests: XCTestCase {
         XCTAssertEqual(mockClient.postCallCount, 1)
     }
 
+    /// A permanent 4xx must not enter the retry queue at all. Before 4xx was classified
+    /// correctly a bad API key made every batch retriable, so each one spent 50 retries
+    /// over ~16 hours and then sat in the plist as a zombie.
+    func testHTTP401DropsBatchInsteadOfQueueingForRetry() {
+        mockClient.postResult = .failure(.statusCode(code: 401, data: nil))
+
+        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        eventManager.push(event: .impression(event))
+
+        let dropped = NSPredicate { _, _ in
+            self.mockClient.postCallCount == 1 && self.eventManager._pendingEvents?.isEmpty == true
+        }
+        wait(for: [expectation(for: dropped, evaluatedWith: nil)], timeout: 3)
+
+        // No pending record means nothing for performRetry to pick up.
+        eventManager.flushAndPersist()
+        XCTAssertEqual(mockClient.postCallCount, 1, "401 batch was retried")
+    }
+
+    /// Negative validation for the above: a 5xx must still be queued for retry.
+    func testHTTP503QueuesBatchForRetry() {
+        mockClient.postResult = .failure(.statusCode(code: 503, data: nil))
+
+        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        eventManager.push(event: .impression(event))
+
+        let queued = NSPredicate { _, _ in
+            self.eventManager._pendingEvents?.values.first?.retries == 1
+        }
+        wait(for: [expectation(for: queued, evaluatedWith: nil)], timeout: 3)
+    }
+
     // MARK: - Batching
 
     func testPushBelowThresholdDoesNotSend() {

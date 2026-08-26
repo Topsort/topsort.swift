@@ -32,8 +32,8 @@ No Makefile, no Xcode project — SPM only.
 
 Events are queued → periodically flushed (every 60s) → batched into a single POST → retried on failure.
 
-- **Retry**: exponential backoff `min(10 * 2^retries, 1200)` seconds, max 50 retries, max 10 concurrent
-- **Non-retriable**: only HTTP 400
+- **Retry**: exponential backoff `min(10 * 2^retries, 1200)` seconds, max 50 retries, max 10 concurrent; a batch that exhausts its retries is dropped
+- **Non-retriable**: all 4xx except 408 and 429. 5xx and transport failures retry
 - **Queue/pending state**: persisted to plist files in app Documents directory
 
 ### Auction Pipeline (AuctionManager)

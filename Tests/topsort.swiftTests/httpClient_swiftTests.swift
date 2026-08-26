@@ -15,14 +15,19 @@ class HTTPClientErrorTests: XCTestCase {
         XCTAssertFalse(error.isRetriable(), "400 Bad Request should NOT be retriable")
     }
 
-    func testStatusCode401IsRetriable() {
+    func testStatusCode401IsNotRetriable() {
         let error = HTTPClientError.statusCode(code: 401, data: nil)
-        XCTAssertTrue(error.isRetriable())
+        XCTAssertFalse(error.isRetriable(), "401 Unauthorized is permanent — a bad API key never becomes good by retrying")
     }
 
-    func testStatusCode403IsRetriable() {
+    func testStatusCode403IsNotRetriable() {
         let error = HTTPClientError.statusCode(code: 403, data: nil)
-        XCTAssertTrue(error.isRetriable())
+        XCTAssertFalse(error.isRetriable(), "403 Forbidden should NOT be retriable")
+    }
+
+    func testStatusCode408IsRetriable() {
+        let error = HTTPClientError.statusCode(code: 408, data: nil)
+        XCTAssertTrue(error.isRetriable(), "408 Request Timeout invites a later attempt")
     }
 
     func testStatusCode429IsRetriable() {
@@ -45,14 +50,24 @@ class HTTPClientErrorTests: XCTestCase {
         XCTAssertTrue(error.isRetriable())
     }
 
-    func testOnly400IsNonRetriable() {
-        // Verify that 400 is the ONLY non-retriable status code
-        for code in [401, 403, 404, 408, 429, 500, 502, 503, 504] {
+    func testClientErrorsAreNotRetriableExceptTimeoutAndRateLimit() {
+        // 4xx is permanent: the same payload will fail the same way every time. Retrying
+        // spends the 50-retry budget and keeps the batch on disk for nothing.
+        for code in [400, 401, 403, 404, 405, 409, 413, 415, 422] {
+            let error = HTTPClientError.statusCode(code: code, data: nil)
+            XCTAssertFalse(error.isRetriable(), "HTTP \(code) should NOT be retriable")
+        }
+        for code in [408, 429] {
             let error = HTTPClientError.statusCode(code: code, data: nil)
             XCTAssertTrue(error.isRetriable(), "HTTP \(code) should be retriable")
         }
-        let error400 = HTTPClientError.statusCode(code: 400, data: nil)
-        XCTAssertFalse(error400.isRetriable(), "Only HTTP 400 should be non-retriable")
+    }
+
+    func testServerErrorsAreRetriable() {
+        for code in [500, 501, 502, 503, 504] {
+            let error = HTTPClientError.statusCode(code: code, data: nil)
+            XCTAssertTrue(error.isRetriable(), "HTTP \(code) should be retriable")
+        }
     }
 
     // MARK: - ErrorData parsing
