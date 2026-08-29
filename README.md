@@ -209,7 +209,7 @@ Topsort (core)              TopsortBanners (UI)
 
 **Offline support**: The SDK detects network connectivity. Requests are paused when offline and automatically flushed when the connection is restored.
 
-**Lifecycle management**: Events are flushed and persisted to disk when the app enters background or terminates.
+**Lifecycle management**: Events are flushed and persisted to disk when the app enters background or terminates; on iOS (not in app extensions) a background task keeps the process alive until the requests that flush started have returned.
 
 ## Configuration Options
 
@@ -221,17 +221,18 @@ Topsort (core)              TopsortBanners (UI)
 | `flushAt` | `Int` | `30` | Number of events that triggers a flush (at least 1) |
 | `flushInterval` | `TimeInterval` | `30` | Seconds between automatic flushes (greater than 0) |
 | `logLevel` | `LogLevel` | `.warning` | Log verbosity: `.none`, `.error`, `.warning`, `.debug` |
+| `onEventsDiscarded` | `(@Sendable (DiscardReason, Int) -> Void)?` | `nil` | Called on the SDK's serial queue each time it gives up on events, with the reason and how many; see [Error Handling](#error-handling) |
 | `identity` | `Identity` | `.persisted` | What happens to a minted user id: `.persisted` (written to disk, reused across launches) or `.ephemeral` (this process only; the stored id is removed) |
 
 ## How Events Are Delivered
 
-A `track` call appends the event to an in-memory queue and returns; nothing happens on the caller's thread. The queue is sent when it reaches `flushAt`, every `flushInterval`, on `flush()`, when the app goes to the background or terminates, and when connectivity returns. Sends are retried with exponential backoff, across being offline and across launches: the queue and every unacknowledged batch are written to `Application Support` (debounced, and synchronously on background/terminate). Events are never dropped for being old; the only drops are the ones [Error Handling](#error-handling) describes.
+A `track` call appends the event to an in-memory queue and returns; nothing happens on the caller's thread. The queue is sent when it reaches `flushAt`, every `flushInterval`, on `flush()`, when the app goes to the background or terminates, and when connectivity returns. Sends are retried with exponential backoff, across being offline and across launches: both are written atomically to `Application Support` — the queue debounced 5 s (and synchronously on background/terminate), the set of unacknowledged batches on every change, because that set is what decides whether a batch is re-sent after a crash. Events are never dropped for being old; the only drops are the ones [Error Handling](#error-handling) describes.
 
 ## Error Handling
 
 `configure()` throws `ConfigurationError` for an invalid `url`, `flushAt < 1` or `flushInterval <= 0`; until it succeeds, `track()` logs and drops the event and `executeAuctions()` throws `AuctionError.notConfigured`.
 
-Events the SDK gives up on are logged and dropped (queue eviction at `.warning`, once per episode; the rest at `.error`): rejected by the API with a 4xx (408 and 429 are retried instead), retried 50 times without success, evicted as the oldest once the queue passes 5,000 events, or impossible to serialize (a non-finite `unitPrice`, say — only the offending event is dropped, not its batch).
+Events the SDK gives up on are logged and dropped, and reported to `Configuration.onEventsDiscarded` with a `DiscardReason` and a count if you set it (queue eviction is logged at `.warning`, once per episode; the rest at `.error`): rejected by the API with a 4xx (408 and 429 are retried instead), retried 50 times without success, evicted as the oldest once the queue passes 5,000 events, or impossible to serialize (a non-finite `unitPrice`, say — only the offending event is dropped, not its batch).
 
 `executeAuctions()` throws `AuctionError`:
 
