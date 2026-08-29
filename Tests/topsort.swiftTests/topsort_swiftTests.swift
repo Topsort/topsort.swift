@@ -73,8 +73,10 @@ final class topsort_swiftTests: XCTestCase {
         fpv.wrappedValue = []
 
         let iterations = 1000
-        let writerQueue = DispatchQueue(label: "com.topsort.test.writer", qos: .background)
-        let readerQueue = DispatchQueue(label: "com.topsort.test.reader", qos: .background)
+        // The test is about the serial queue, not scheduling: .background work is throttled
+        // hard on an iOS simulator and 1000 synchronous plist writes blow the timeout.
+        let writerQueue = DispatchQueue(label: "com.topsort.test.writer", qos: .userInitiated)
+        let readerQueue = DispatchQueue(label: "com.topsort.test.reader", qos: .userInitiated)
         let writerDone = expectation(description: "writer done")
         let readerDone = expectation(description: "reader done")
 

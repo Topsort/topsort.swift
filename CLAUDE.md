@@ -101,7 +101,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 
 | Workflow | Trigger | Runner | Command |
 |----------|---------|--------|---------|
-| Test | push (all branches) | macos-15 | `swift build` + `swift test` |
+| Test | push to main, PR | macos-15 | `swift build` + `swift test`; `xcodebuild test` on an iPhone simulator |
 | Format | PR (*.swift changes) | macos-14 | `swiftformat --lint .` |
 | Typos | PR (*.md, *.yml, *.swift) | ubuntu-22.04 | `crate-ci/typos@v1.24.1` |
 | Actions | PR (.github/workflows/*) | ubuntu-latest | `actionlint v1.7.7` |
