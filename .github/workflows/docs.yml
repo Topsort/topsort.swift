@@ -33,7 +33,7 @@ jobs:
       # Best-effort: without a fresh artifact the badge keeps its last published value.
       - name: Download coverage badge data
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-badge
           path: badge
