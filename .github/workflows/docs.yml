@@ -54,7 +54,7 @@ jobs:
           fi
           echo '<a href="https://github.com/Topsort/topsort.swift">topsort.swift</a>' > site/index.html
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
