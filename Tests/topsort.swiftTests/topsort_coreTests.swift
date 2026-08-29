@@ -58,6 +58,53 @@ class TopsortCoreTests: XCTestCase {
 
     // MARK: - isConfigured guard (tests real Topsort.shared)
 
+    // MARK: - Identity
+
+    private var opaqueUserIdFileExists: Bool {
+        FileManager.default.fileExists(atPath: PathHelper.path(for: "com.topsort.analytics.opaque-user-id.plist"))
+    }
+
+    func testEphemeralIdentityMintsAPerProcessIdAndWritesNothing() throws {
+        Topsort.shared.set(opaqueUserId: "stored-id")
+        wait(for: [expectation(for: NSPredicate { _, _ in self.opaqueUserIdFileExists }, evaluatedWith: nil)], timeout: 2)
+
+        var config = Configuration(apiKey: "test-key")
+        config.identity = .ephemeral
+        try Topsort.shared.configure(config)
+
+        let id = Topsort.shared.opaqueUserId
+        XCTAssertNotEqual(id, "stored-id", "the stored id must not carry over")
+        XCTAssertNotNil(UUID(uuidString: id))
+        XCTAssertEqual(Topsort.shared.opaqueUserId, id, "stable within the process")
+        wait(for: [expectation(for: NSPredicate { _, _ in !self.opaqueUserIdFileExists }, evaluatedWith: nil)], timeout: 2)
+
+        Topsort.shared.set(opaqueUserId: "host-id")
+        XCTAssertEqual(Topsort.shared.opaqueUserId, "host-id")
+        XCTAssertFalse(opaqueUserIdFileExists, "a host id is honoured in memory only")
+    }
+
+    func testReconfiguringWhileEphemeralKeepsTheProcessId() throws {
+        var config = Configuration(apiKey: "test-key")
+        config.identity = .ephemeral
+        try Topsort.shared.configure(config)
+        let id = Topsort.shared.opaqueUserId
+        try Topsort.shared.configure(config)
+        XCTAssertEqual(Topsort.shared.opaqueUserId, id, "a token refresh must not split a session")
+    }
+
+    func testReturningToPersistedIdentityMintsAndStoresANewId() throws {
+        var ephemeral = Configuration(apiKey: "test-key")
+        ephemeral.identity = .ephemeral
+        try Topsort.shared.configure(ephemeral)
+        let ephemeralId = Topsort.shared.opaqueUserId
+
+        try Topsort.shared.configure(Configuration(apiKey: "test-key"))
+        let persisted = Topsort.shared.opaqueUserId
+        XCTAssertNotEqual(persisted, ephemeralId)
+        XCTAssertEqual(Topsort.shared.opaqueUserId, persisted)
+        wait(for: [expectation(for: NSPredicate { _, _ in self.opaqueUserIdFileExists }, evaluatedWith: nil)], timeout: 2)
+    }
+
     func testTrackDropsEventsWhenNotConfigured() {
         // Temporarily set Topsort.shared to unconfigured
         Topsort.shared.isConfigured = false

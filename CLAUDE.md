@@ -86,7 +86,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 | Flush threshold (`flushAt`) | 30 events | `Configuration.swift` |
 
 **Persistence files** (`Application Support/com.topsort.analytics/`):
-- `com.topsort.analytics.opaque-user-id.plist`
+- `com.topsort.analytics.opaque-user-id.plist` (absent under `Configuration.identity = .ephemeral`)
 - `com.topsort.analytics.event-queue.plist`
 - `com.topsort.analytics.pending-events.plist`
 
