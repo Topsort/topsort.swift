@@ -32,11 +32,19 @@ public enum ValidationError: LocalizedError {
 }
 
 public struct TopsortError: Error, Decodable {
-    let message: String
+    /// Only `errCode` is required by the API.
+    let message: String?
     let errCode: TopsortErrorCode
 }
 
 public enum TopsortErrorCode: Decodable {
+    /// The API sends the code as a string (`"invalid_api_key"`); the synthesized decoder would
+    /// expect an object keyed by case name and never match a real response.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TopsortErrorCode(rawValue: raw) ?? .unknownError(code: raw)
+    }
+
     case badRequest
     case emptyRequest
     case internalServerError

@@ -40,7 +40,7 @@ class TopsortErrorCodeTests: XCTestCase {
 class TopsortErrorDecodingTests: XCTestCase {
     func testDecodeTopsortErrorBadRequest() throws {
         let json = """
-        {"message": "Bad request", "errCode": {"badRequest": {}}}
+        {"message": "Bad request", "errCode": "bad_request"}
         """
         let data = try XCTUnwrap(json.data(using: .utf8))
         let error = try JSONDecoder().decode(TopsortError.self, from: data)
@@ -52,7 +52,7 @@ class TopsortErrorDecodingTests: XCTestCase {
 
     func testDecodeTopsortErrorInvalidApiKey() throws {
         let json = """
-        {"message": "Invalid key", "errCode": {"invalidApiKey": {}}}
+        {"message": "Invalid key", "errCode": "invalid_api_key"}
         """
         let data = try XCTUnwrap(json.data(using: .utf8))
         let error = try JSONDecoder().decode(TopsortError.self, from: data)
@@ -63,7 +63,7 @@ class TopsortErrorDecodingTests: XCTestCase {
 
     func testDecodeTopsortErrorUnknownCode() throws {
         let json = """
-        {"message": "New thing", "errCode": {"unknownError": {"code": "new_error_type"}}}
+        {"message": "New thing", "errCode": "new_error_type"}
         """
         let data = try XCTUnwrap(json.data(using: .utf8))
         let error = try JSONDecoder().decode(TopsortError.self, from: data)

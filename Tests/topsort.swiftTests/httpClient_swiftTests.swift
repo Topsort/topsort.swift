@@ -74,7 +74,7 @@ class HTTPClientErrorTests: XCTestCase {
 
     func testErrorDataParsesTopsortError() {
         let json = """
-        {"message": "Invalid API key", "errCode": {"invalidApiKey": {}}}
+        {"message": "Invalid API key", "errCode": "invalid_api_key"}
         """
         let data = json.data(using: .utf8)
         let errorData = ErrorData(data: data)
