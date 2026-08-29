@@ -11,6 +11,7 @@ jobs:
   typos:
     name: Check for language typos
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         # No major tag unfortunately

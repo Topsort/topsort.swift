@@ -1,11 +1,19 @@
 name: Test
 on:
-  push
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to the same PR supersedes the run in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  macos:
+    name: macOS (swift test)
     runs-on: macos-15
-
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -18,3 +26,38 @@ jobs:
           XCTEST="$BIN/TopsortPackageTests.xctest/Contents/MacOS/TopsortPackageTests"
           PROFDATA=$(find .build -name 'default.profdata' -type f)
           xcrun llvm-cov export "$XCTEST" -instr-profile="$PROFDATA" -format=lcov > coverage.lcov
+
+  ios:
+    name: iOS simulator (xcodebuild test)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pick a simulator
+        id: sim
+        # The runner image decides which iPhone models exist; take the first available one
+        # instead of naming a model that the next image may not ship.
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          print(next(d['udid'] for runtime, sims in devices.items() if 'iOS' in runtime for d in sims if d['name'].startswith('iPhone')))")
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Test on the simulator
+        # Full output goes to the log file; the step prints only test and error lines.
+        run: |
+          status=0
+          xcodebuild test \
+            -scheme Topsort-Package \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -enableCodeCoverage YES \
+            -resultBundlePath ios.xcresult \
+            > xcodebuild.log 2>&1 || status=$?
+          grep -E "Test Suite|Test Case .* (passed|failed)|error:|\*\* TEST" xcodebuild.log || true
+          exit "$status"
+      - name: Upload result bundle on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcresult
+          path: ios.xcresult

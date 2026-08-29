@@ -9,6 +9,7 @@ jobs:
   format:
     name: Validate Swift formatting
     runs-on: macos-14
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - run: swiftformat --lint --reporter github-actions-log .

@@ -21,7 +21,9 @@ class PathHelperMigrationTests: XCTestCase {
         try? fileManager.removeItem(atPath: oldPath)
         try? fileManager.removeItem(atPath: newPath)
 
-        // Create a file at the old location
+        // Create a file at the old location. On an iOS simulator the test host's Documents
+        // directory does not exist until something creates it, and createFile fails silently.
+        try fileManager.createDirectory(atPath: documentsPath, withIntermediateDirectories: true)
         let testData = try PropertyListEncoder().encode(["test": "data"])
         fileManager.createFile(atPath: oldPath, contents: testData)
         XCTAssertTrue(fileManager.fileExists(atPath: oldPath))
