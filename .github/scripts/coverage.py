@@ -31,7 +31,7 @@ try:
         print(f"{t['name']}: {100 * t['lineCoverage']:.1f}% ({t['coveredLines']}/{t['executableLines']})")
     print(f"library lines: {percent:.1f}% ({covered}/{total})")
     shown = round(percent)
-    badge.update(message=f"{shown}%", color="brightgreen" if shown >= 75 else "orange")
+    badge.update(message=f"{shown}%", color="brightgreen" if args.min is None or percent >= args.min else "orange")
 except (OSError, KeyError, ValueError, ZeroDivisionError) as e:
     print(f"no usable report ({e})", file=sys.stderr)
 

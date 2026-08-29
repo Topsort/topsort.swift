@@ -39,7 +39,7 @@ Events are queued → periodically flushed (every 30s) → batched into POSTs of
 - **Non-retriable**: all 4xx except 408 and 429. 5xx and transport failures retry
 - **Bounds**: queue capped at 5000 events (oldest shed first); each POST carries at most 500 events
 - **Flush triggers**: queue reaches `flushAt` (default 30), the `flushInterval` timer, `flush()`, background/terminate, connectivity restored. `configure` rejects `flushAt < 1` and `flushInterval <= 0`
-- **Queue/pending state**: persisted to plist files in `Application Support/com.topsort.analytics/` (migrated from Documents on first launch; `PathHelper.swift`), debounced 5 s, synchronous on background/terminate
+- **Queue/pending state**: persisted to plist files in `Application Support/com.topsort.analytics/` (migrated from Documents on first launch; `PathHelper.swift`). Both write atomically; the queue is debounced 5 s (synchronous on background/terminate), the pending set is written on every change — it is the at-least-once ledger
 
 ### Auction Pipeline (AuctionManager)
 
@@ -69,7 +69,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 ### Type conventions
 - Internal types: `class` singletons (`EventManager`, `AuctionManager`, `HTTPClient`)
 - Public models: `struct` value types conforming to `Codable` (`Event`, `PurchaseEvent`, `Auction`, `AuctionResponse`)
-- UI components are SwiftUI only; UIKit/AppKit appear only behind `canImport` for the lifecycle observer and image decoding
+- UI components are SwiftUI only; UIKit/AppKit appear only behind `canImport` for the lifecycle observer, the background task (`BackgroundTasks.swift`) and image decoding
 
 ## Important Constants & Paths
 
