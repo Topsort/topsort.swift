@@ -104,11 +104,34 @@ class FilePersistedValueDeferTests: XCTestCase {
         XCTAssertEqual(loaded.eventCount, 1)
     }
 
-    /// The on-disk shape has not changed since 1.0.0. Changing it means records written by an
-    /// older version stop loading, so it needs a migration, not just a new field.
-    func testPendingRecordSchemaIsUnchangedSince1_0_0() throws {
-        let record = PendingEvents(id: UUID(), data: Data(), createdAt: Date(), retries: 0, lastRetry: Date())
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(record)) as? [String: Any])
-        XCTAssertEqual(Set(json.keys), ["id", "data", "createdAt", "retries", "lastRetry"])
+    /// A record as 1.0.0 wrote it (same fields ever since) must still load. If this stops
+    /// decoding, the change needs a migration, not just a new field.
+    func testPendingRecordWrittenBy1_0_0StillLoads() throws {
+        let uuid = "6B0E8E57-1D14-4E7A-9C2B-3A2C1D5E6F70"
+        let plist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>value</key>
+            <array>
+                <string>\(uuid)</string>
+                <dict>
+                    <key>id</key><string>\(uuid)</string>
+                    <key>data</key><data>e30=</data>
+                    <key>createdAt</key><date>2026-03-18T12:00:00Z</date>
+                    <key>retries</key><integer>3</integer>
+                    <key>lastRetry</key><date>2026-03-18T12:05:00Z</date>
+                </dict>
+            </array>
+        </dict>
+        </plist>
+        """
+        try Data(plist.utf8).write(to: URL(fileURLWithPath: path))
+
+        let loaded = try XCTUnwrap(FilePersistedValue<[UUID: PendingEvents]>(storePath: path).wrappedValue?[XCTUnwrap(UUID(uuidString: uuid))])
+        XCTAssertEqual(loaded.data, Data("{}".utf8))
+        XCTAssertEqual(loaded.retries, 3)
+        XCTAssertEqual(loaded.lastRetry.timeIntervalSince(loaded.createdAt), 300)
     }
 }

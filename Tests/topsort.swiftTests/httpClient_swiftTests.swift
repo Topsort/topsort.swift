@@ -284,7 +284,8 @@ class HTTPClientIntegrationTests: XCTestCase {
         respond(503)
         guard case let .failure(.statusCode(code, data)) = post() else { return XCTFail("expected statusCode") }
         XCTAssertEqual(code, 503)
-        if case let .data(body) = data { XCTAssertTrue(body.isEmpty) } // URLSession hands back empty Data, not nil
+        guard case let .data(body) = data else { return XCTFail("expected raw data, got \(String(describing: data))") }
+        XCTAssertTrue(body.isEmpty) // URLSession hands back empty Data, not nil
     }
 
     func testPostTransportFailureMapsToUnknown() {

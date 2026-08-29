@@ -58,7 +58,7 @@ jobs:
         run: |
           xcrun xccov view --report --json ios.xcresult > xccov.json
           mkdir -p badge
-          python3 .github/scripts/coverage.py xccov.json --min 70 --badge badge/coverage.json
+          python3 .github/scripts/coverage.py xccov.json --min 75 --badge badge/coverage.json
       - name: Upload coverage badge data
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v7
