@@ -156,7 +156,7 @@ public struct Event: Codable {
      The marketplace's unique ID for the impression. This field ensures the event reporting is idempotent in case there is
      a network issue and the request is retried.
      */
-    let id: UUID
+    let id: String
 
     /**
      If the impression is over an ad promotion, this is the `resolvedBidId` field received from the /auctions request.
@@ -189,7 +189,8 @@ public struct Event: Codable {
         deviceType: String? = nil,
         channel: String? = nil,
         additionalAttribution: Entity? = nil,
-        clickType: String? = nil
+        clickType: String? = nil,
+        id: String = UUID().uuidString
     ) {
         self.entity = entity
         self.occurredAt = occurredAt
@@ -201,7 +202,7 @@ public struct Event: Codable {
         self.channel = channel
         self.additionalAttribution = additionalAttribution
         self.clickType = clickType
-        id = UUID()
+        self.id = id
     }
 
     public init(
@@ -213,7 +214,8 @@ public struct Event: Codable {
         deviceType: String? = nil,
         channel: String? = nil,
         additionalAttribution: Entity? = nil,
-        clickType: String? = nil
+        clickType: String? = nil,
+        id: String = UUID().uuidString
     ) {
         entity = nil
         self.occurredAt = occurredAt
@@ -225,7 +227,7 @@ public struct Event: Codable {
         self.channel = channel
         self.additionalAttribution = additionalAttribution
         self.clickType = clickType
-        id = UUID()
+        self.id = id
     }
 }
 
@@ -267,7 +269,7 @@ public struct PurchaseEvent: Codable {
     /**
      The marketplace unique ID for the order. Ensures idempotent event reporting.
      */
-    let id: UUID
+    let id: String
 
     /// Device type: "desktop" or "mobile".
     let deviceType: String?
@@ -280,14 +282,15 @@ public struct PurchaseEvent: Codable {
         occurredAt: Date,
         opaqueUserId: String = Topsort.shared.opaqueUserId,
         deviceType: String? = nil,
-        channel: String? = nil
+        channel: String? = nil,
+        id: String = UUID().uuidString
     ) {
         self.items = items
         self.occurredAt = occurredAt
         self.opaqueUserId = opaqueUserId
         self.deviceType = deviceType
         self.channel = channel
-        id = UUID()
+        self.id = id
     }
 }
 
@@ -296,7 +299,8 @@ public struct PageViewEvent: Codable {
     @TSDateValue
     var occurredAt: Date
     let opaqueUserId: String
-    let id: UUID
+    /// The marketplace's unique ID for the page view; the API dedups on it.
+    let id: String
     let page: Page
 
     /// Device type: "desktop" or "mobile".
@@ -310,14 +314,15 @@ public struct PageViewEvent: Codable {
         occurredAt: Date,
         opaqueUserId: String = Topsort.shared.opaqueUserId,
         deviceType: String? = nil,
-        channel: String? = nil
+        channel: String? = nil,
+        id: String = UUID().uuidString
     ) {
         self.page = page
         self.occurredAt = occurredAt
         self.opaqueUserId = opaqueUserId
         self.deviceType = deviceType
         self.channel = channel
-        id = UUID()
+        self.id = id
     }
 }
 
