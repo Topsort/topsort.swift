@@ -395,6 +395,70 @@ class EventManagerTests: XCTestCase {
         wait(for: [expectation(for: gone, evaluatedWith: nil)], timeout: 2)
     }
 
+    // MARK: - onEventsDiscarded
+
+    private final class Discards: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _all: [(DiscardReason, Int)] = []
+        var all: [(DiscardReason, Int)] {
+            lock.withLock { _all }
+        }
+
+        func record(_ reason: DiscardReason, _ count: Int) {
+            lock.withLock { _all.append((reason, count)) }
+        }
+    }
+
+    private func recordDiscards() -> Discards {
+        let discards = Discards()
+        XCTAssertNoThrow(try eventManager.configure(apiKey: "test-key", url: nil, onEventsDiscarded: { discards.record($0, $1) }))
+        return discards
+    }
+
+    private func waitForDiscard(_ discards: Discards, _ reason: DiscardReason, _ count: Int) {
+        let seen = NSPredicate { _, _ in discards.all.contains { $0.0 == reason && $0.1 == count } }
+        wait(for: [expectation(for: seen, evaluatedWith: nil)], timeout: 3)
+        XCTAssertEqual(discards.all.count, 1, "unexpected extra discards: \(discards.all)")
+    }
+
+    func testDiscardCallbackOnQueueOverCapacity() {
+        let discards = recordDiscards()
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        eventManager._eventQueue = (0 ..< MAX_QUEUED_EVENTS).map { i in
+            .impression(Event(entity: Entity(type: .product, id: "p\(i)"), occurredAt: Date.now))
+        }
+        eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "newest"), occurredAt: Date.now)))
+        waitForDiscard(discards, .queueOverCapacity, 1)
+    }
+
+    func testDiscardCallbackOnUnserializableEvent() {
+        let discards = recordDiscards()
+        let bad = PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: .nan)], occurredAt: Date.now)
+        eventManager.push(event: .purchase(bad))
+        waitForDiscard(discards, .unserializable, 1)
+    }
+
+    func testDiscardCallbackOnPermanentRejection() {
+        let discards = recordDiscards()
+        mockClient.postResult = .failure(.statusCode(code: 401, data: nil))
+        eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)))
+        waitForDiscard(discards, .permanentlyRejected, 1)
+    }
+
+    func testDiscardCallbackOnExhaustedRetriesCountsTheBatch() throws {
+        let discards = recordDiscards()
+        mockClient.postResult = .failure(.statusCode(code: 500, data: nil))
+        let two = Events(impressions: [
+            Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now),
+            Event(entity: Entity(type: .product, id: "p2"), occurredAt: Date.now),
+        ])
+        let id = UUID()
+        let stale = Date(timeIntervalSinceNow: -100_000)
+        eventManager._pendingEvents = try [id: PendingEvents(id: id, data: JSONEncoder().encode(two), createdAt: stale, retries: MAX_RETRIES, lastRetry: stale)]
+        eventManager.flush()
+        waitForDiscard(discards, .retriesExhausted, 2)
+    }
+
     private static func pendingRecordsOnDisk() -> Int {
         let path = PathHelper.path(for: "com.topsort.analytics.pending-events.plist")
         return FilePersistedValue<[UUID: PendingEvents]>(storePath: path).wrappedValue?.count ?? 0

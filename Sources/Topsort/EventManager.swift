@@ -38,6 +38,13 @@ struct PendingEvents: Codable {
     let createdAt: Date
     var retries: Int
     var lastRetry: Date
+    /// How many events the stored body carries; the body is the only record of them.
+    var eventCount: Int {
+        guard let events = try? JSONDecoder().decode(Events.self, from: data) else { return 0 }
+        return (events.impressions?.count ?? 0) + (events.clicks?.count ?? 0)
+            + (events.purchases?.count ?? 0) + (events.pageviews?.count ?? 0)
+    }
+
     var retryAfter: Date {
         let base = 10.0
         let max = 1200.0
@@ -94,6 +101,7 @@ class EventManager {
 
     private var inProgress: Set<UUID> = []
     private var queueAtCapacityLogged = false
+    var onEventsDiscarded: ((DiscardReason, Int) -> Void)?
     var flushAt: Int = 30
     var flushInterval: TimeInterval = 30
     private var lifecycleObserver: LifecycleObserver?
@@ -133,7 +141,7 @@ class EventManager {
     var url: URL = EVENTS_TOPSORT_URL
     var client: HTTPClient
 
-    func configure(apiKey: String, url: String?, flushAt: Int? = nil, flushInterval: TimeInterval? = nil) throws(ConfigurationError) {
+    func configure(apiKey: String, url: String?, flushAt: Int? = nil, flushInterval: TimeInterval? = nil, onEventsDiscarded: ((DiscardReason, Int) -> Void)? = nil) throws(ConfigurationError) {
         if let flushAt = flushAt, flushAt < 1 {
             throw .invalidFlushAt(flushAt)
         }
@@ -148,6 +156,7 @@ class EventManager {
         }
         serialQueue.sync {
             self.client.apiKey = apiKey
+            self.onEventsDiscarded = onEventsDiscarded
             if let flushAt = flushAt {
                 self.flushAt = flushAt
             }
@@ -164,7 +173,9 @@ class EventManager {
         serialQueue.async {
             self.eventQueue.append(event)
             if self.eventQueue.count > MAX_QUEUED_EVENTS {
-                self.eventQueue.removeFirst(self.eventQueue.count - MAX_QUEUED_EVENTS)
+                let dropped = self.eventQueue.count - MAX_QUEUED_EVENTS
+                self.eventQueue.removeFirst(dropped)
+                self.discarded(dropped, reason: .queueOverCapacity)
                 // Logged once per episode: at capacity every push sheds an event, and one
                 // line per event would drown the log during a long outage.
                 if !self.queueAtCapacityLogged {
@@ -239,6 +250,7 @@ class EventManager {
         }
         let encodable = batch.filter { (try? encoder.encode($0)) != nil }
         Logger.error("Dropping \(batch.count - encodable.count) events that cannot be serialized")
+        discarded(batch.count - encodable.count, reason: .unserializable)
         guard !encodable.isEmpty else {
             return nil
         }
@@ -262,15 +274,24 @@ class EventManager {
                         // Retries exhausted: retire the batch. Without this it stays in
                         // pendingEvents with a frozen retries/lastRetry, so retryAfter is
                         // permanently in the past and it is re-sent on every flush forever.
-                        self.pendingEvents.removeValue(forKey: id)
+                        let batch = self.pendingEvents.removeValue(forKey: id)
                         Logger.error("Dropping events after \(MAX_RETRIES) failed retries: \(error)")
+                        self.discarded(max(batch?.eventCount ?? 0, 1), reason: .retriesExhausted)
                     }
                 } else {
-                    self.pendingEvents.removeValue(forKey: id)
+                    let batch = self.pendingEvents.removeValue(forKey: id)
                     Logger.error("Failed to send events (non-retriable): \(error)")
+                    self.discarded(max(batch?.eventCount ?? 0, 1), reason: .permanentlyRejected)
                 }
             }
         }
+    }
+
+    /// Must be called on serialQueue. A stored batch whose body no longer decodes still held at
+    /// least one event, so it is never reported as zero.
+    private func discarded(_ count: Int, reason: DiscardReason) {
+        guard count > 0, let onEventsDiscarded else { return }
+        onEventsDiscarded(reason, count)
     }
 
     /// Must be called on serialQueue
