@@ -20,7 +20,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Topsort/topsort.swift.git", from: "1.0.0"),
+    .package(url: "https://github.com/Topsort/topsort.swift.git", from: "1.1.0"),
 ]
 ```
 
@@ -55,7 +55,13 @@ struct MyApp: App {
         config.flushAt = 30               // Optional: event batch size (default: 30)
         config.flushInterval = 30         // Optional: flush interval in seconds (default: 30)
         config.logLevel = .warning        // Optional: .none, .error, .warning, .debug
-        try! Topsort.shared.configure(config)
+        do {
+            try Topsort.shared.configure(config)
+        } catch {
+            // Invalid url, flushAt < 1 or flushInterval <= 0. Until this succeeds,
+            // track() drops events and executeAuctions() throws .notConfigured.
+            print("Topsort not configured: \(error.localizedDescription)")
+        }
     }
 
     var body: some Scene {
@@ -92,7 +98,7 @@ See all auction models in [`Auctions.swift`](Sources/Topsort/Models/Auctions.swi
 
 ### 3. Track Events
 
-Track impressions, clicks, and purchases. Events are batched automatically and flushed every 30 seconds or when the batch reaches 30 events.
+Track impressions, clicks, purchases, and page views. Events are batched automatically and flushed every 30 seconds or when the batch reaches 30 events; see [How Events Are Delivered](#how-events-are-delivered).
 
 #### Impressions & Clicks
 
@@ -107,6 +113,8 @@ Topsort.shared.track(impression: event)  // on view appear
 Topsort.shared.track(click: event)       // on tap
 ```
 
+Report each impression once per `resolvedBidId`, when the creative is on screen. Both initializers also take optional context: `placement`, `page`, `deviceType`, `channel`, `additionalAttribution` (a product or vendor `Entity` to attribute purchases to besides the ad's own; only meaningful with `resolvedBidId`) and, for clicks, `clickType` (`"product"`, `"like"`, `"add-to-cart"`).
+
 #### Purchases
 
 ```swift
@@ -116,6 +124,15 @@ let items = [
 ]
 let purchase = PurchaseEvent(items: items, occurredAt: Date.now)
 Topsort.shared.track(purchase: purchase)
+```
+
+`PurchaseItem` also takes `vendorId` for vendor-level attribution.
+
+#### Page Views
+
+```swift
+let pageview = PageViewEvent(page: Page(type: "category", pageId: "shoes"), occurredAt: Date.now)
+Topsort.shared.track(pageview: pageview)
 ```
 
 #### Manual Flush
@@ -130,7 +147,7 @@ See all event models in [`Events.swift`](Sources/Topsort/Models/Events.swift).
 
 ### 4. Banners (SwiftUI)
 
-Drop-in banner component that handles the full lifecycle: auction, image loading, impression tracking (on render), and click tracking.
+Drop-in banner component that handles the full lifecycle: auction, image loading, impression tracking (when the image has loaded), and click tracking.
 
 ```swift
 import TopsortBanners
@@ -161,8 +178,9 @@ Topsort (core)              TopsortBanners (UI)
 ├── Topsort.shared          └── TopsortBanner (SwiftUI View)
 │   ├── configure()             ├── Runs auction
 │   ├── track(impression:)      ├── Loads & renders image
-│   ├── track(click:)           ├── Tracks impression on render
+│   ├── track(click:)           ├── Tracks impression on image load
 │   ├── track(purchase:)        └── Tracks click on tap
+│   ├── track(pageview:)
 │   ├── flush()
 │   └── executeAuctions()
 ├── EventManager (queue, batch, retry)
@@ -170,7 +188,7 @@ Topsort (core)              TopsortBanners (UI)
 └── HTTPClient (ephemeral URLSession)
 ```
 
-**Event pipeline**: Events are queued in memory, batched by count or interval, and flushed to the Topsort API. Failed requests are retried with exponential backoff (up to 50 retries, 20 min max). Events persist across app restarts via plist storage.
+**Event pipeline**: Events are queued in memory, batched by count or interval, and flushed to the Topsort API in POSTs of at most 500 events. Failed requests are retried with exponential backoff (up to 50 retries, 20 min max). Events persist across app restarts in `Application Support`.
 
 **Offline support**: The SDK detects network connectivity. Requests are paused when offline and automatically flushed when the connection is restored.
 
@@ -181,19 +199,63 @@ Topsort (core)              TopsortBanners (UI)
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `apiKey` | `String` | Required | Your Topsort API key |
-| `url` | `String?` | `nil` | Custom API base URL (defaults to `https://api.topsort.com/v2`) |
+| `url` | `String?` | `nil` | Custom API base URL, including the version path — e.g. `https://proxy.example.com/v2` (defaults to `https://api.topsort.com/v2`) |
 | `auctionsTimeout` | `TimeInterval?` | `60` | Auction request timeout in seconds |
-| `flushAt` | `Int` | `30` | Number of events that triggers a flush |
-| `flushInterval` | `TimeInterval` | `30` | Seconds between automatic flushes |
+| `flushAt` | `Int` | `30` | Number of events that triggers a flush (at least 1) |
+| `flushInterval` | `TimeInterval` | `30` | Seconds between automatic flushes (greater than 0) |
 | `logLevel` | `LogLevel` | `.warning` | Log verbosity: `.none`, `.error`, `.warning`, `.debug` |
+
+## How Events Are Delivered
+
+A `track` call appends the event to an in-memory queue and returns; nothing happens on the caller's thread. The queue is sent when it reaches `flushAt`, every `flushInterval`, on `flush()`, when the app goes to the background or terminates, and when connectivity returns. Sends are retried with exponential backoff, across being offline and across launches: the queue and every unacknowledged batch are written to `Application Support` (debounced, and synchronously on background/terminate). Events are never dropped for being old; the only drops are the ones [Error Handling](#error-handling) describes.
+
+## Error Handling
+
+`configure()` throws `ConfigurationError` for an invalid `url`, `flushAt < 1` or `flushInterval <= 0`; until it succeeds, `track()` logs and drops the event and `executeAuctions()` throws `AuctionError.notConfigured`.
+
+Events the SDK gives up on are logged and dropped (queue eviction at `.warning`, once per episode; the rest at `.error`): rejected by the API with a 4xx (408 and 429 are retried instead), retried 50 times without success, evicted as the oldest once the queue passes 5,000 events, or impossible to serialize (a non-finite `unitPrice`, say — only the offending event is dropped, not its batch).
+
+`executeAuctions()` throws `AuctionError`:
+
+```swift
+do {
+    let response = try await Topsort.shared.executeAuctions(auctions: auctions)
+} catch {
+    switch error {
+    case let .http(error):                       // transport failure or 4xx/5xx status
+        print("Auction request failed: \(error)")
+    case let .invalidNumberAuctions(count):      // must be 1–5
+        print("Sent \(count) auctions")
+    case .serializationError, .deserializationError, .emptyResponse:
+        print("Unexpected payload: \(error)")
+    case .notConfigured:
+        print("Call configure() first")
+    }
+}
+```
 
 ## Testing
 
-The SDK is designed for testability. Inject `MockTopsort` (conforming to `TopsortProtocol`) to test your code without network calls:
+`TopsortBanner` accepts any `TopsortProtocol` conformer, so your tests can inject a stub that returns a canned `AuctionResponse` and records tracked events. The SDK ships no mock. A minimal stub:
 
 ```swift
-let mock = MockTopsort(executeAuctionsMockResponse: mockResponse)
-let banner = TopsortBanner(bannerAuctionBuilder: builder, topsort: mock)
+final class StubTopsort: TopsortProtocol {
+    var opaqueUserId = "test-user"
+    var isConfigured = true
+    var response: AuctionResponse
+    var tracked: [Event] = []
+    init(response: AuctionResponse) { self.response = response }
+    func set(opaqueUserId: String?) {}
+    func configure(_: Configuration) throws {}
+    func track(impression event: Event) { tracked.append(event) }
+    func track(click event: Event) { tracked.append(event) }
+    func track(purchase _: PurchaseEvent) {}
+    func track(pageview _: PageViewEvent) {}
+    func flush() {}
+    func executeAuctions(auctions _: [Auction]) async throws(AuctionError) -> AuctionResponse { response }
+}
+
+let banner = TopsortBanner(bannerAuctionBuilder: builder, topsort: StubTopsort(response: canned))
 ```
 
 ## Requirements
