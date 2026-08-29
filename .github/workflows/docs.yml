@@ -1,0 +1,70 @@
+name: Publish Pages
+
+# Runs after the Test workflow finishes on main, so the coverage badge reflects the numbers
+# that run produced on the iOS simulator.
+on:
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read   # to download the coverage artifact from the triggering run
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Pages
+    # Only a push to this repository's main: workflow_run's `branches` filter matches the head
+    # branch name, which a fork PR controls.
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # Best-effort: without a fresh artifact the badge keeps its last published value.
+      - name: Download coverage badge data
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-badge
+          path: badge
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # A shields.io "endpoint" badge reads this JSON; nothing is stored anywhere but Pages.
+      - name: Assemble the site
+        run: |
+          mkdir -p site
+          curl -fsSL https://topsort.github.io/topsort.swift/coverage.json -o previous.json || true
+          if [ -f badge/coverage.json ]; then
+            cp badge/coverage.json site/coverage.json
+          elif [ -f previous.json ]; then
+            cp previous.json site/coverage.json
+          else
+            echo '{"schemaVersion":1,"label":"coverage","message":"unknown","color":"lightgrey"}' > site/coverage.json
+          fi
+          echo '<a href="https://github.com/Topsort/topsort.swift">topsort.swift</a>' > site/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

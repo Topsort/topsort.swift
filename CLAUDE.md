@@ -107,8 +107,12 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 | Actions | PR (.github/workflows/*) | ubuntu-latest | `actionlint v1.7.7` |
 | Conventional Commits | PR (opened/edited/synchronize) | ubuntu-24.04 | `amannn/action-semantic-pull-request` |
 | Release Please | push to main | ubuntu-24.04 | `googleapis/release-please-action` |
+| Publish Pages | after Test on main | ubuntu-24.04 | publishes `coverage.json` for the README badge |
 
 ## Testing
+
+Coverage is measured on the iOS simulator job over the two library targets (test bundles excluded)
+and gated at 70 % lines by `.github/scripts/coverage.py`; the same script writes the badge JSON.
 
 Tests use **XCTest** — no third-party test frameworks. Two mock strategies:
 
