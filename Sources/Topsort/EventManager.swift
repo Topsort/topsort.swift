@@ -48,7 +48,7 @@ struct PendingEvents: Codable {
 }
 
 private let MAX_IN_PROGRESS = 10
-private let MAX_RETRIES = 50
+let MAX_RETRIES = 50
 
 class EventManager {
     static let shared = EventManager()
@@ -216,6 +216,12 @@ class EventManager {
                         pendingEvents.lastRetry = Date()
                         self.pendingEvents[id] = pendingEvents
                         Logger.warning("Failed to send events, will retry: \(error)")
+                    } else {
+                        // Retries exhausted: retire the batch. Without this it stays in
+                        // pendingEvents with a frozen retries/lastRetry, so retryAfter is
+                        // permanently in the past and it is re-sent on every flush forever.
+                        self.pendingEvents.removeValue(forKey: id)
+                        Logger.error("Dropping events after \(MAX_RETRIES) failed retries: \(error)")
                     }
                 } else {
                     self.pendingEvents.removeValue(forKey: id)

@@ -164,6 +164,51 @@ class EventManagerTests: XCTestCase {
 
         XCTAssertEqual(mockClient.postCallCount, 1)
     }
+
+    // MARK: - Retry exhaustion
+
+    /// Regression: a batch that has exhausted MAX_RETRIES must be retired.
+    /// Before the fix it stayed in pendingEvents with a frozen retries/lastRetry, so its
+    /// retryAfter was permanently in the past and performRetry re-sent it on every flush,
+    /// forever, while the record grew the persisted plist without bound.
+    func testExhaustedBatchIsRetiredAndNotRetriedAgain() {
+        mockClient.postResult = .failure(.statusCode(code: 500, data: nil))
+        let id = UUID()
+        let stale = Date(timeIntervalSinceNow: -100_000)
+        eventManager._pendingEvents = [
+            id: PendingEvents(id: id, data: Data("{}".utf8), createdAt: stale, retries: MAX_RETRIES, lastRetry: stale),
+        ]
+
+        eventManager.flush()
+
+        let retired = NSPredicate { _, _ in self.eventManager._pendingEvents?[id] == nil }
+        wait(for: [expectation(for: retired, evaluatedWith: nil)], timeout: 3)
+        XCTAssertEqual(mockClient.postCallCount, 1)
+
+        // A further flush must not resurrect it. flushAndPersist runs performRetry
+        // synchronously and MockHTTPClient invokes its callback inline, so any re-send
+        // would already be counted by the time this returns.
+        eventManager.flushAndPersist()
+        XCTAssertEqual(mockClient.postCallCount, 1, "Retired batch was sent again")
+        XCTAssertNil(eventManager._pendingEvents?[id])
+    }
+
+    /// Negative validation for the above: a batch that has NOT exhausted its retries must
+    /// be kept and its retry count incremented — retirement must not swallow live batches.
+    func testUnexhaustedBatchIsKeptAndRetryCountIncremented() {
+        mockClient.postResult = .failure(.statusCode(code: 500, data: nil))
+        let id = UUID()
+        let stale = Date(timeIntervalSinceNow: -100_000)
+        eventManager._pendingEvents = [
+            id: PendingEvents(id: id, data: Data("{}".utf8), createdAt: stale, retries: 3, lastRetry: stale),
+        ]
+
+        eventManager.flush()
+
+        let incremented = NSPredicate { _, _ in self.eventManager._pendingEvents?[id]?.retries == 4 }
+        wait(for: [expectation(for: incremented, evaluatedWith: nil)], timeout: 3)
+        XCTAssertEqual(mockClient.postCallCount, 1)
+    }
 }
 
 // MARK: - PendingEvents backoff tests
