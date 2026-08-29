@@ -155,6 +155,20 @@ class APIContractAuctionTests: XCTestCase {
 }
 
 class APIContractEventTests: XCTestCase {
+    /// `id` is the idempotency key the API dedups on. A host that has its own order or
+    /// impression id passes it so a retry after a crash cannot double-count.
+    func testHostSuppliedIdsAreSentVerbatim() throws {
+        let id = "ORD-12345"
+        func idField<T: Encodable>(_ value: T) throws -> String? {
+            try (JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as? [String: Any])?["id"] as? String
+        }
+        XCTAssertEqual(try idField(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now, id: id)), id)
+        XCTAssertEqual(try idField(Event(resolvedBidId: "bid", occurredAt: Date.now, id: id)), id)
+        XCTAssertEqual(try idField(PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 1)], occurredAt: Date.now, id: id)), id)
+        XCTAssertEqual(try idField(PageViewEvent(page: Page(type: "home", pageId: "home"), occurredAt: Date.now, id: id)), id)
+        XCTAssertNotNil(UUID(uuidString: Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now).id), "the default must still mint a fresh UUID")
+    }
+
     override func setUp() {
         super.setUp()
         Topsort.shared.set(opaqueUserId: "user-123")
