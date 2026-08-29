@@ -64,6 +64,9 @@ docs: update README with error handling examples
 - Include a summary of what changed and why
 - Add a test plan describing how to verify the changes
 - Ensure `swift build`, `swift test`, and `swiftformat .` all pass
+- PR titles must be lowercase Conventional Commits (`fix: retire exhausted batches`, not `Fix: ...`): the squash-merge subject is what release-please versions and logs
+- CI also runs the suite on an iOS simulator (`xcodebuild test -scheme Topsort-Package`) and fails below 70 % line coverage over the two library targets
+- Do not edit `CHANGELOG.md` by hand; release-please writes it from PR titles
 - Large changes should be broken into stacked PRs
 
 ## Testing

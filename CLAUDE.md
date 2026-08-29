@@ -67,7 +67,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 ### Type conventions
 - Internal types: `class` singletons (`EventManager`, `AuctionManager`, `HTTPClient`)
 - Public models: `struct` value types conforming to `Codable` (`Event`, `PurchaseEvent`, `Auction`, `AuctionResponse`)
-- No UIKit — SwiftUI only for UI components
+- UI components are SwiftUI only; UIKit/AppKit appear only behind `canImport` for the lifecycle observer and image decoding
 
 ## Important Constants & Paths
 
@@ -113,7 +113,8 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 ## Testing
 
 Coverage is measured on the iOS simulator job over the two library targets (test bundles excluded)
-and gated at 70 % lines by `.github/scripts/coverage.py`; the same script writes the badge JSON.
+and gated at 70 % lines by `.github/scripts/coverage.py`; the same script writes the badge JSON
+(green from 75 %, orange between the gate and that).
 
 Tests use **XCTest** — no third-party test frameworks. Two mock strategies:
 

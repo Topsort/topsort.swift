@@ -25,6 +25,7 @@ jobs:
     # branch name, which a fork PR controls.
     if: >-
       github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 10

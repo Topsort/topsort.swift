@@ -4,3 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      # upload-artifact and download-artifact share a backend and must move together.
+      artifact-actions:
+        patterns:
+          - actions/upload-artifact
+          - actions/download-artifact
