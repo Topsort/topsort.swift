@@ -132,6 +132,12 @@ class EventManager {
     var client: HTTPClient
 
     func configure(apiKey: String, url: String?, flushAt: Int? = nil, flushInterval: TimeInterval? = nil) throws(ConfigurationError) {
+        if let flushAt = flushAt, flushAt < 1 {
+            throw .invalidFlushAt(flushAt)
+        }
+        if let flushInterval = flushInterval, flushInterval <= 0 {
+            throw .invalidFlushInterval(flushInterval)
+        }
         if let url = url {
             guard let parsedURL = URL(string: "\(url)/events") else {
                 throw .invalidURL(url)

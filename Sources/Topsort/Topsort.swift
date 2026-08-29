@@ -39,13 +39,13 @@ public class Topsort: TopsortProtocol {
     }
 
     public func configure(_ configuration: Configuration) throws(ConfigurationError) {
-        Logger.logLevel = configuration.logLevel
         try EventManager.shared.configure(
             apiKey: configuration.apiKey,
             url: configuration.url,
             flushAt: configuration.flushAt,
             flushInterval: configuration.flushInterval
         )
+        Logger.logLevel = configuration.logLevel
         try AuctionManager.shared.configure(apiKey: configuration.apiKey, url: configuration.url)
         if let timeout = configuration.auctionsTimeout {
             AuctionManager.shared.timeoutInterval = timeout
