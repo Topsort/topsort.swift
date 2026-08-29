@@ -20,12 +20,12 @@
             eventManager.flushAt = 1
             // testManualFlushSendsWhenOnline asserts that nothing is sent before flush(); the
             // singleton's periodic timer must not be able to fire inside that window.
-            try? eventManager.configure(apiKey: "test-key", url: nil, flushInterval: 3600)
+            XCTAssertNoThrow(try eventManager.configure(apiKey: "test-key", url: nil, flushInterval: 3600))
             Topsort.shared.set(opaqueUserId: "test-user")
         }
 
         override func tearDown() {
-            try? eventManager.configure(apiKey: "test-key", url: nil, flushInterval: 30)
+            XCTAssertNoThrow(try eventManager.configure(apiKey: "test-key", url: nil, flushInterval: 30))
             eventManager = nil
             mockClient = nil
             mockNetwork = nil
