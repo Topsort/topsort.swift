@@ -33,8 +33,8 @@ public enum ValidationError: LocalizedError {
 
 public struct TopsortError: Error, Decodable {
     /// Only `errCode` is required by the API.
-    let message: String?
-    let errCode: TopsortErrorCode
+    public let message: String?
+    public let errCode: TopsortErrorCode
 }
 
 public enum TopsortErrorCode: Decodable {

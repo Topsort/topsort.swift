@@ -176,6 +176,18 @@ TopsortBanner(bannerAuctionBuilder: .init(slotId: "home-banner", deviceType: "mo
     .clipped()
 ```
 
+### 5. Hands-on: `TopsortClient`
+
+If you run your own event pipeline and only want the models and the transport, `TopsortClient` makes one request at a time and keeps nothing — no queue, retry or persistence. A thrown error means you still own the events. Pass `opaqueUserId` to every event: the initializers' default reaches for `Topsort.shared`, which mints and persists a device id.
+
+```swift
+let client = try TopsortClient(apiKey: "your-api-key")
+let response = try await client.auctions(auctions)
+try await client.send(clicks: [Event(resolvedBidId: winner.resolvedBidId, occurredAt: Date.now, opaqueUserId: userId)])
+```
+
+`Topsort.shared` remains the recommended path; it is what gives you batching, retries and delivery across launches.
+
 ## Architecture
 
 ```

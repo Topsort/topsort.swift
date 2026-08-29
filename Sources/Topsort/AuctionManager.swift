@@ -34,6 +34,11 @@ class AuctionManager {
     }
 
     func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
+        try await Self.executeAuctions(auctions, client: client, url: url, timeout: timeoutInterval)
+    }
+
+    /// The request itself, shared with `TopsortClient`.
+    static func executeAuctions(_ auctions: [Auction], client: HTTPClient, url: URL, timeout: TimeInterval) async throws(AuctionError) -> AuctionResponse {
         if auctions.count > MAX_AUCTIONS || auctions.count < MIN_AUCTIONS {
             Logger.error("Invalid number of auctions: \(auctions.count), must be between \(MIN_AUCTIONS) and \(MAX_AUCTIONS)")
             throw AuctionError.invalidNumberAuctions(count: auctions.count)
@@ -45,7 +50,7 @@ class AuctionManager {
 
         let result: Result<Data?, HTTPClientError>
         do {
-            let data = try await client.asyncPost(url: url, data: auctionsData, timeoutInterval: timeoutInterval)
+            let data = try await client.asyncPost(url: url, data: auctionsData, timeoutInterval: timeout)
             result = .success(data)
         } catch {
             result = .failure(error)
@@ -54,7 +59,7 @@ class AuctionManager {
         return try process_response(result: result)
     }
 
-    private func process_response(result: Result<Data?, HTTPClientError>) throws(AuctionError) -> AuctionResponse {
+    private static func process_response(result: Result<Data?, HTTPClientError>) throws(AuctionError) -> AuctionResponse {
         switch result {
         case let .success(data):
             guard let data = data else {
@@ -67,7 +72,7 @@ class AuctionManager {
         }
     }
 
-    private func decodeAuctionResponse(data: Data) throws(AuctionError) -> AuctionResponse {
+    private static func decodeAuctionResponse(data: Data) throws(AuctionError) -> AuctionResponse {
         do {
             return try JSONDecoder().decode(AuctionResponse.self, from: data)
         } catch {
