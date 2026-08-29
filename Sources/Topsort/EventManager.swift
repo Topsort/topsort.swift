@@ -106,8 +106,10 @@ class EventManager {
         #if canImport(Network)
             networkMonitor = NetworkMonitor()
         #endif
+        // The queue can afford the 5 s debounce: a lost write costs at most a few events. The
+        // pending set is the at-least-once ledger — a batch acknowledged in memory but still on
+        // disk is re-sent after a crash and billed twice — so every change is written right away.
         __eventQueue.deferPersistence = true
-        __pendingEvents.deferPersistence = true
         periodicEvent = PeriodicEvent(interval: 30, action: { EventManager.shared.handlePeriodicEvent() })
         periodicEvent.start()
         lifecycleObserver = LifecycleObserver(
@@ -193,6 +195,7 @@ class EventManager {
             self.performSend()
             self.performRetry()
             self.__eventQueue.persistIfDirty()
+            // Never dirty (it persists on every change); the call still drains its queued writes.
             self.__pendingEvents.persistIfDirty()
         }
     }

@@ -369,6 +369,37 @@ class EventManagerTests: XCTestCase {
         XCTAssertNil(eventManager._pendingEvents?[id])
     }
 
+    /// The pending set must reach disk as soon as it changes, not on the queue's 5 s debounce:
+    /// a batch acknowledged in memory but still on disk is re-sent after a crash.
+    func testPendingRecordReachesDiskImmediatelyOnFailure() {
+        eventManager.flushAndPersist() // setUp's empty pending set is now on disk
+        XCTAssertEqual(Self.pendingRecordsOnDisk(), 0)
+        mockClient.postResult = .failure(.statusCode(code: 500, data: nil))
+        eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)))
+
+        let onDisk = NSPredicate { _, _ in Self.pendingRecordsOnDisk() == 1 }
+        wait(for: [expectation(for: onDisk, evaluatedWith: nil)], timeout: 2)
+    }
+
+    func testAcknowledgedRecordLeavesDiskImmediately() {
+        eventManager.flushAndPersist()
+        XCTAssertEqual(Self.pendingRecordsOnDisk(), 0)
+        let id = UUID()
+        let stale = Date(timeIntervalSinceNow: -100_000)
+        eventManager._pendingEvents = [id: PendingEvents(id: id, data: Data("{}".utf8), createdAt: stale, retries: 1, lastRetry: stale)]
+        wait(for: [expectation(for: NSPredicate { _, _ in Self.pendingRecordsOnDisk() == 1 }, evaluatedWith: nil)], timeout: 2)
+
+        eventManager.flush()
+
+        let gone = NSPredicate { _, _ in self.mockClient.postCallCount == 1 && Self.pendingRecordsOnDisk() == 0 }
+        wait(for: [expectation(for: gone, evaluatedWith: nil)], timeout: 2)
+    }
+
+    private static func pendingRecordsOnDisk() -> Int {
+        let path = PathHelper.path(for: "com.topsort.analytics.pending-events.plist")
+        return FilePersistedValue<[UUID: PendingEvents]>(storePath: path).wrappedValue?.count ?? 0
+    }
+
     /// Negative validation for the above: a batch that has NOT exhausted its retries must
     /// be kept and its retry count incremented — retirement must not swallow live batches.
     func testUnexhaustedBatchIsKeptAndRetryCountIncremented() {

@@ -68,14 +68,16 @@ public class FilePersistedValue<T: Codable> {
 
     private func persistSync(value: T?) {
         do {
-            let fileManager = FileManager.default
-            if fileManager.fileExists(atPath: storePath) {
-                try fileManager.removeItem(atPath: storePath)
-            }
-            guard value != nil else { return }
-            let data = try PropertyListEncoder().encode(PersistedValueWrapper(value: value))
             let url = URL(fileURLWithPath: storePath)
-            try data.write(to: url)
+            guard let value else {
+                if FileManager.default.fileExists(atPath: storePath) {
+                    try FileManager.default.removeItem(atPath: storePath)
+                }
+                return
+            }
+            let data = try PropertyListEncoder().encode(PersistedValueWrapper(value: value))
+            // Atomic: a crash mid-write must leave the previous file, not no file.
+            try data.write(to: url, options: .atomic)
         } catch {
             Logger.error("Error persisting value: \(error)")
         }
