@@ -10,7 +10,7 @@ assignees: ""
 
 - **SDK version**:
 - **Swift version**:
-- **Platform** (iOS/macOS/tvOS/watchOS):
+- **Platform** (iOS/macOS):
 - **OS version**:
 
 ## Description

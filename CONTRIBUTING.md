@@ -76,7 +76,7 @@ docs: update README with error handling examples
 
 Open an issue with:
 
-- Swift version and platform (iOS/macOS/tvOS/watchOS)
+- Swift version and platform (iOS/macOS)
 - SDK version
 - Steps to reproduce
 - Expected vs actual behavior
