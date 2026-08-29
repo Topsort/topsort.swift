@@ -41,8 +41,12 @@ struct PendingEvents: Codable {
     /// How many events the stored body carries; the body is the only record of them.
     var eventCount: Int {
         guard let events = try? JSONDecoder().decode(Events.self, from: data) else { return 0 }
-        return (events.impressions?.count ?? 0) + (events.clicks?.count ?? 0)
-            + (events.purchases?.count ?? 0) + (events.pageviews?.count ?? 0)
+        // Written as statements: the one-line sum of four optionals times out Xcode 16's type checker.
+        var count = events.impressions?.count ?? 0
+        count += events.clicks?.count ?? 0
+        count += events.purchases?.count ?? 0
+        count += events.pageviews?.count ?? 0
+        return count
     }
 
     var retryAfter: Date {
