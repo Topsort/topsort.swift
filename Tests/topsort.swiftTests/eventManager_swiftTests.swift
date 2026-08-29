@@ -230,6 +230,41 @@ class EventManagerTests: XCTestCase {
         XCTAssertEqual(sizes, [MAX_EVENTS_PER_BATCH, MAX_EVENTS_PER_BATCH, 200])
     }
 
+    /// The drain stops at the in-flight cap; what is left waits for the next flush.
+    func testSendLoopStopsAtTheInFlightCap() {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        let total = MAX_EVENTS_PER_BATCH * (MAX_IN_PROGRESS + 1)
+        eventManager._eventQueue = (0 ..< total).map { i in
+            .impression(Event(entity: Entity(type: .product, id: "p\(i)"), occurredAt: Date.now))
+        }
+
+        eventManager.flushAndPersist()
+
+        XCTAssertEqual(mockClient.postCallCount, MAX_IN_PROGRESS)
+        XCTAssertEqual(eventManager._eventQueue?.count, MAX_EVENTS_PER_BATCH, "the batch past the cap should stay queued")
+    }
+
+    /// JSONEncoder refuses non-finite doubles. One such purchase must not take the rest of
+    /// its batch with it, nor stall the queue behind it.
+    func testUnencodableEventIsDroppedWithoutItsBatch() throws {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        let bad = PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: .nan)], occurredAt: Date.now)
+        eventManager._eventQueue = [
+            .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)),
+            .purchase(bad),
+            .click(Event(entity: Entity(type: .product, id: "p2"), occurredAt: Date.now)),
+        ]
+
+        eventManager.flushAndPersist()
+
+        XCTAssertEqual(mockClient.postCallCount, 1)
+        XCTAssertEqual(eventManager._eventQueue?.count, 0)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(mockClient.postData)) as? [String: Any])
+        XCTAssertEqual((json["impressions"] as? [[String: Any]])?.count, 1)
+        XCTAssertEqual((json["clicks"] as? [[String: Any]])?.count, 1)
+        XCTAssertNil(json["purchases"])
+    }
+
     // MARK: - Batching
 
     func testPushBelowThresholdDoesNotSend() {

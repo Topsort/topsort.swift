@@ -30,7 +30,7 @@ No Makefile, no Xcode project — SPM only.
 
 ### Event Pipeline (EventManager)
 
-Events are queued → periodically flushed (every 60s) → batched into a single POST → retried on failure.
+Events are queued → periodically flushed (every 30s) → batched into POSTs of at most 500 events → retried on failure.
 
 - **Retry**: exponential backoff `min(10 * 2^retries, 1200)` seconds, max 50 retries, max 10 concurrent; a batch that exhausts its retries is dropped
 - **Non-retriable**: all 4xx except 408 and 429. 5xx and transport failures retry
@@ -79,7 +79,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 | Max queued events | 5000 (oldest dropped) | `EventManager.swift` |
 | Max events per batch | 500 | `EventManager.swift` |
 | Max backoff | 1200s (20 min) | `EventManager.swift` |
-| Flush interval | 60s | `EventManager.swift` |
+| Flush interval | 30s | `EventManager.swift` |
 
 **Persistence files** (app Documents dir):
 - `com.topsort.analytics.opaque-user-id.plist`
