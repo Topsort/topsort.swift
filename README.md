@@ -1,6 +1,7 @@
 # topsort.swift
 
 [![Build](https://github.com/Topsort/topsort.swift/actions/workflows/test.yml/badge.svg)](https://github.com/Topsort/topsort.swift/actions/workflows/test.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://topsort.github.io/topsort.swift/coverage.json)](https://github.com/Topsort/topsort.swift/actions/workflows/test.yml)
 [![Swift 6 toolchain](https://img.shields.io/badge/Swift-6%20toolchain%20(Xcode%2016+)-orange.svg)](https://swift.org)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS%2015+%20|%20macOS%2012+-blue.svg)](https://github.com/Topsort/topsort.swift)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)

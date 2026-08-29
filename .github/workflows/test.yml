@@ -55,6 +55,18 @@ jobs:
             > xcodebuild.log 2>&1 || status=$?
           grep -E "Test Suite|Test Case .* (passed|failed)|error:|\*\* TEST" xcodebuild.log || true
           exit "$status"
+      # The iOS numbers are the ones that matter: this is the platform integrators ship on.
+      - name: Check coverage
+        run: |
+          xcrun xccov view --report --json ios.xcresult > xccov.json
+          mkdir -p badge
+          python3 .github/scripts/coverage.py xccov.json --min 70 --badge badge/coverage.json
+      - name: Upload coverage badge data
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-badge
+          path: badge
       - name: Upload result bundle on failure
         if: failure()
         uses: actions/upload-artifact@v4
