@@ -113,8 +113,8 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 ## Testing
 
 Coverage is measured on the iOS simulator job over the two library targets (test bundles excluded)
-and gated at 70 % lines by `.github/scripts/coverage.py`; the same script writes the badge JSON
-(green from 75 %, orange between the gate and that).
+and gated at 75 % lines by `.github/scripts/coverage.py`; the same script writes the badge JSON
+(green at or above the gate, orange below).
 
 Tests use **XCTest** — no third-party test frameworks. Two mock strategies:
 

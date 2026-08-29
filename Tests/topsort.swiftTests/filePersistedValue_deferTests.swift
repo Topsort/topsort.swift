@@ -84,4 +84,54 @@ class FilePersistedValueDeferTests: XCTestCase {
         let reloaded = FilePersistedValue<Int>(storePath: path)
         XCTAssertEqual(reloaded.wrappedValue, 77)
     }
+
+    // MARK: - Pending-set persistence
+
+    /// What the pipeline writes on one launch must load unchanged on the next.
+    func testPendingSetRoundTripsThroughDisk() throws {
+        let id = UUID()
+        let body = try JSONEncoder().encode(Events(impressions: [Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)]))
+        let record = PendingEvents(id: id, data: body, createdAt: Date(timeIntervalSince1970: 1_700_000_000), retries: 3, lastRetry: Date(timeIntervalSince1970: 1_700_000_100))
+        FilePersistedValue<[UUID: PendingEvents]>(storePath: path).wrappedValue = [id: record]
+        wait(for: [expectation(for: NSPredicate { _, _ in FileManager.default.fileExists(atPath: self.path) }, evaluatedWith: nil)], timeout: 2)
+
+        let loaded = try XCTUnwrap(FilePersistedValue<[UUID: PendingEvents]>(storePath: path).wrappedValue?[id])
+        XCTAssertEqual(loaded.id, id)
+        XCTAssertEqual(loaded.data, body)
+        XCTAssertEqual(loaded.createdAt, record.createdAt)
+        XCTAssertEqual(loaded.retries, 3)
+        XCTAssertEqual(loaded.lastRetry, record.lastRetry)
+        XCTAssertEqual(loaded.eventCount, 1)
+    }
+
+    /// A record as 1.0.0 wrote it (same fields ever since) must still load. If this stops
+    /// decoding, the change needs a migration, not just a new field.
+    func testPendingRecordWrittenBy1_0_0StillLoads() throws {
+        let uuid = "6B0E8E57-1D14-4E7A-9C2B-3A2C1D5E6F70"
+        let plist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>value</key>
+            <array>
+                <string>\(uuid)</string>
+                <dict>
+                    <key>id</key><string>\(uuid)</string>
+                    <key>data</key><data>e30=</data>
+                    <key>createdAt</key><date>2026-03-18T12:00:00Z</date>
+                    <key>retries</key><integer>3</integer>
+                    <key>lastRetry</key><date>2026-03-18T12:05:00Z</date>
+                </dict>
+            </array>
+        </dict>
+        </plist>
+        """
+        try Data(plist.utf8).write(to: URL(fileURLWithPath: path))
+
+        let loaded = try XCTUnwrap(FilePersistedValue<[UUID: PendingEvents]>(storePath: path).wrappedValue?[XCTUnwrap(UUID(uuidString: uuid))])
+        XCTAssertEqual(loaded.data, Data("{}".utf8))
+        XCTAssertEqual(loaded.retries, 3)
+        XCTAssertEqual(loaded.lastRetry.timeIntervalSince(loaded.createdAt), 300)
+    }
 }

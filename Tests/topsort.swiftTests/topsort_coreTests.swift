@@ -152,6 +152,18 @@ class TopsortCoreTests: XCTestCase {
         XCTAssertTrue(mockClient.postCalled)
     }
 
+    func testTrackPageviewReachesEventManager() throws {
+        Topsort.shared.set(opaqueUserId: "test-user")
+        Topsort.shared.track(pageview: PageViewEvent(page: Page(type: "category", pageId: "shoes"), occurredAt: Date.now))
+        Topsort.shared.flush()
+
+        wait(for: [expectation(for: NSPredicate { _, _ in self.mockClient.postCalled }, evaluatedWith: nil)], timeout: 3)
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(mockClient.postData)) as? [String: Any])
+        let pageviews = try XCTUnwrap(json["pageviews"] as? [[String: Any]])
+        XCTAssertEqual((pageviews.first?["page"] as? [String: Any])?["pageId"] as? String, "shoes")
+    }
+
     // MARK: - Deprecated overload
 
     func testDeprecatedConfigureStillWorks() throws {
