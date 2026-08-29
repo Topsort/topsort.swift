@@ -47,8 +47,14 @@ struct PendingEvents: Codable {
     }
 }
 
-private let MAX_IN_PROGRESS = 10
+let MAX_IN_PROGRESS = 10
 let MAX_RETRIES = 50
+/// Resource bound on the queue. Events are dropped oldest-first past this, rather than by
+/// age: how long an event stays attributable is a server-side decision the client cannot know.
+let MAX_QUEUED_EVENTS = 5000
+/// Cap on a single POST body. Past this the request risks a 413, which is non-retriable and
+/// would discard the whole batch.
+let MAX_EVENTS_PER_BATCH = 500
 
 class EventManager {
     static let shared = EventManager()
@@ -87,6 +93,7 @@ class EventManager {
     }
 
     private var inProgress: Set<UUID> = []
+    private var queueAtCapacityLogged = false
     var flushAt: Int = 30
     var flushInterval: TimeInterval = 30
     private var lifecycleObserver: LifecycleObserver?
@@ -148,6 +155,17 @@ class EventManager {
     func push(event: EventItem) {
         serialQueue.async {
             self.eventQueue.append(event)
+            if self.eventQueue.count > MAX_QUEUED_EVENTS {
+                self.eventQueue.removeFirst(self.eventQueue.count - MAX_QUEUED_EVENTS)
+                // Logged once per episode: at capacity every push sheds an event, and one
+                // line per event would drown the log during a long outage.
+                if !self.queueAtCapacityLogged {
+                    self.queueAtCapacityLogged = true
+                    Logger.warning("Event queue is at capacity (\(MAX_QUEUED_EVENTS)); dropping the oldest events until it drains")
+                }
+            } else {
+                self.queueAtCapacityLogged = false
+            }
             if self.eventQueue.count >= self.flushAt {
                 self.performSend()
             }
@@ -185,26 +203,37 @@ class EventManager {
                 return
             }
         #endif
-        if inProgress.count > MAX_IN_PROGRESS {
-            return
-        }
-        if eventQueue.isEmpty {
-            return
-        }
-        let events = eventQueue.toEvents()
-        guard let data = try? JSONEncoder().encode(events) else {
-            Logger.error("Failed to serialize events: \(events)")
-            return
-        }
-        let id = UUID()
-        let pending = PendingEvents(id: id, data: data, createdAt: Date(), retries: 0, lastRetry: Date())
-        pendingEvents[id] = pending
-        inProgress.insert(id)
+        while !eventQueue.isEmpty, inProgress.count < MAX_IN_PROGRESS {
+            let batch = Array(eventQueue.prefix(MAX_EVENTS_PER_BATCH))
+            eventQueue.removeFirst(batch.count)
+            guard let data = encode(batch) else {
+                continue
+            }
+            let id = UUID()
+            let pending = PendingEvents(id: id, data: data, createdAt: Date(), retries: 0, lastRetry: Date())
+            pendingEvents[id] = pending
+            inProgress.insert(id)
 
-        client.post(url: url, data: data, callback: { r in
-            self.process_response(id: id, result: r)
-        })
-        eventQueue = []
+            client.post(url: url, data: data, callback: { r in
+                self.process_response(id: id, result: r)
+            })
+        }
+    }
+
+    /// An event that cannot be serialized (a non-finite `Double` in a purchase, say) can
+    /// never be sent; keeping it would stall every later batch behind it. Only the offending
+    /// events are dropped, not the batch they happened to share.
+    private func encode(_ batch: [EventItem]) -> Data? {
+        let encoder = JSONEncoder()
+        if let data = try? encoder.encode(batch.toEvents()) {
+            return data
+        }
+        let encodable = batch.filter { (try? encoder.encode($0)) != nil }
+        Logger.error("Dropping \(batch.count - encodable.count) events that cannot be serialized")
+        guard !encodable.isEmpty else {
+            return nil
+        }
+        return try? encoder.encode(encodable.toEvents())
     }
 
     private func process_response(id: UUID, result: Result<Data?, HTTPClientError>) {
@@ -247,7 +276,7 @@ class EventManager {
                 return
             }
         #endif
-        if inProgress.count > MAX_IN_PROGRESS {
+        if inProgress.count >= MAX_IN_PROGRESS {
             return
         }
         let now = Date()

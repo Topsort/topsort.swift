@@ -167,6 +167,104 @@ class EventManagerTests: XCTestCase {
         wait(for: [expectation(for: queued, evaluatedWith: nil)], timeout: 3)
     }
 
+    // MARK: - Bounds
+
+    private func entityId(_ item: EventItem?) -> String? {
+        guard case let .impression(event)? = item else { return nil }
+        return event.entity?.id
+    }
+
+    /// The queue grew without limit while sends were failing or the device was offline.
+    /// It is now a fixed-capacity buffer that sheds the oldest event.
+    func testQueueIsBoundedAndDropsOldestFirst() {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10 // never auto-sends
+        eventManager._eventQueue = (0 ..< MAX_QUEUED_EVENTS).map { i in
+            .impression(Event(entity: Entity(type: .product, id: "p\(i)"), occurredAt: Date.now))
+        }
+
+        eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "newest"), occurredAt: Date.now)))
+
+        let bounded = NSPredicate { _, _ in self.eventManager._eventQueue?.count == MAX_QUEUED_EVENTS }
+        wait(for: [expectation(for: bounded, evaluatedWith: nil)], timeout: 5)
+
+        let queue = eventManager._eventQueue ?? []
+        XCTAssertEqual(entityId(queue.first), "p1", "the oldest event should have been shed")
+        XCTAssertEqual(entityId(queue.last), "newest", "the newest event should have been kept")
+    }
+
+    /// Negative validation for the above: below capacity nothing is dropped.
+    func testQueueBelowCapacityKeepsEveryEvent() {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        eventManager._eventQueue = (0 ..< 10).map { i in
+            .impression(Event(entity: Entity(type: .product, id: "p\(i)"), occurredAt: Date.now))
+        }
+
+        eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "newest"), occurredAt: Date.now)))
+
+        let appended = NSPredicate { _, _ in self.eventManager._eventQueue?.count == 11 }
+        wait(for: [expectation(for: appended, evaluatedWith: nil)], timeout: 3)
+        XCTAssertEqual(entityId(eventManager._eventQueue?.first), "p0", "nothing should be dropped below capacity")
+    }
+
+    /// A backlog used to go out as one unbounded POST, which invites a 413 — non-retriable,
+    /// so the entire backlog would be discarded. It is now split into capped batches.
+    func testLargeQueueIsSentInBatchesCappedAtMaxEventsPerBatch() throws {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        let total = MAX_EVENTS_PER_BATCH * 2 + 200
+        eventManager._eventQueue = (0 ..< total).map { i in
+            .impression(Event(entity: Entity(type: .product, id: "p\(i)"), occurredAt: Date.now))
+        }
+
+        // Synchronous: MockHTTPClient calls back inline, so every POST is counted on return.
+        eventManager.flushAndPersist()
+
+        XCTAssertEqual(mockClient.postCallCount, 3)
+        XCTAssertEqual(eventManager._eventQueue?.count, 0, "the whole backlog should have been drained")
+
+        var sizes: [Int] = []
+        for data in mockClient.allPostedData {
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let impressions = try XCTUnwrap(json["impressions"] as? [[String: Any]])
+            sizes.append(impressions.count)
+        }
+        XCTAssertEqual(sizes, [MAX_EVENTS_PER_BATCH, MAX_EVENTS_PER_BATCH, 200])
+    }
+
+    /// The drain stops at the in-flight cap; what is left waits for the next flush.
+    func testSendLoopStopsAtTheInFlightCap() {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        let total = MAX_EVENTS_PER_BATCH * (MAX_IN_PROGRESS + 1)
+        eventManager._eventQueue = (0 ..< total).map { i in
+            .impression(Event(entity: Entity(type: .product, id: "p\(i)"), occurredAt: Date.now))
+        }
+
+        eventManager.flushAndPersist()
+
+        XCTAssertEqual(mockClient.postCallCount, MAX_IN_PROGRESS)
+        XCTAssertEqual(eventManager._eventQueue?.count, MAX_EVENTS_PER_BATCH, "the batch past the cap should stay queued")
+    }
+
+    /// JSONEncoder refuses non-finite doubles. One such purchase must not take the rest of
+    /// its batch with it, nor stall the queue behind it.
+    func testUnencodableEventIsDroppedWithoutItsBatch() throws {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        let bad = PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: .nan)], occurredAt: Date.now)
+        eventManager._eventQueue = [
+            .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)),
+            .purchase(bad),
+            .click(Event(entity: Entity(type: .product, id: "p2"), occurredAt: Date.now)),
+        ]
+
+        eventManager.flushAndPersist()
+
+        XCTAssertEqual(mockClient.postCallCount, 1)
+        XCTAssertEqual(eventManager._eventQueue?.count, 0)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(mockClient.postData)) as? [String: Any])
+        XCTAssertEqual((json["impressions"] as? [[String: Any]])?.count, 1)
+        XCTAssertEqual((json["clicks"] as? [[String: Any]])?.count, 1)
+        XCTAssertNil(json["purchases"])
+    }
+
     // MARK: - Batching
 
     func testPushBelowThresholdDoesNotSend() {
