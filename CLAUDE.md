@@ -105,6 +105,8 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 | Format | PR (*.swift changes) | macos-14 | `swiftformat --lint .` |
 | Typos | PR (*.md, *.yml, *.swift) | ubuntu-22.04 | `crate-ci/typos@v1.24.1` |
 | Actions | PR (.github/workflows/*) | ubuntu-latest | `actionlint v1.7.7` |
+| Conventional Commits | PR (opened/edited/synchronize) | ubuntu-24.04 | `amannn/action-semantic-pull-request` |
+| Release Please | push to main | ubuntu-24.04 | `googleapis/release-please-action` |
 
 ## Testing
 
@@ -127,6 +129,15 @@ All tests use `@testable import` to access internal types.
 - Never approve or merge a PR that has unresolved review comments — address or explicitly dismiss each one first. Always check nested/threaded comments (e.g. replies under bot comments) as they may contain substantive issues not visible at the top level.
 - Before merging with `--admin`, wait at least **5 minutes** after the PR is opened. This gives Bugbot and other async bots time to post their comments. After the wait, check all PR comments (including nested/threaded replies) for unresolved issues before merging.
 - After every significant architectural change, review this `CLAUDE.md` and update it if the change affects documented patterns, constraints, or workflows.
+
+## Releasing
+
+release-please keeps a release PR open against `main`; merging it bumps `Sources/Topsort/Version.swift`
+and the README `from:` line (both annotated `x-release-please-version`), updates `CHANGELOG.md`,
+tags without a `v` prefix, and creates the GitHub release. Nothing to publish afterwards — SPM reads
+the tag. PR titles are the squash-merge subjects it reads, so they must be Conventional Commits with
+a lowercase subject (`validate-pr-title.yml` enforces it). `feat!:` or a `BREAKING CHANGE:` footer
+makes the next release a major.
 
 ## Contributor Recipes
 
