@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(UIKit) && !os(watchOS)
+    import UIKit
+#endif
 
 private let EVENTS_TOPSORT_URL = URL(string: "https://api.topsort.com/v2/events")!
 
@@ -112,6 +115,15 @@ class EventManager {
     #if canImport(Network)
         var networkMonitor: NetworkMonitoring
     #endif
+    #if canImport(UIKit) && !os(watchOS)
+        /// Held from the background flush until the last in-flight request returns, so the
+        /// system does not suspend the process mid-send. Main thread only.
+        private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+        var backgroundTasks: BackgroundTaskProviding = UIApplicationBackgroundTasks()
+        var isHoldingBackgroundTask: Bool {
+            backgroundTask != .invalid
+        }
+    #endif
 
     private init() {
         client = HTTPClient(apiKey: nil)
@@ -127,7 +139,9 @@ class EventManager {
         lifecycleObserver = LifecycleObserver(
             onBackground: { [weak self] in
                 Logger.debug("App entering background — flushing and persisting events")
+                self?.beginBackgroundTask()
                 self?.flushAndPersist()
+                self?.endBackgroundTaskIfIdle()
             },
             onTerminate: { [weak self] in
                 Logger.debug("App terminating — flushing and persisting events")
@@ -264,6 +278,9 @@ class EventManager {
     private func process_response(id: UUID, result: Result<Data?, HTTPClientError>) {
         serialQueue.async {
             self.inProgress.remove(id)
+            if self.inProgress.isEmpty {
+                DispatchQueue.main.async { self.endBackgroundTaskIfIdle() }
+            }
             switch result {
             case .success:
                 self.pendingEvents.removeValue(forKey: id)
@@ -330,4 +347,35 @@ class EventManager {
     private func handlePeriodicEvent() {
         flush()
     }
+
+    #if canImport(UIKit) && !os(watchOS)
+        private func beginBackgroundTask() {
+            guard backgroundTask == .invalid else { return }
+            backgroundTask = backgroundTasks.begin(name: "com.topsort.analytics.flush") { [weak self] in
+                self?.endBackgroundTask()
+            }
+        }
+
+        private func endBackgroundTaskIfIdle() {
+            guard backgroundTask != .invalid else { return }
+            let idle = serialQueue.sync {
+                // Drain the ledger's queued writes first: releasing the task while the ack is
+                // still on its way to disk would re-send the batch after a suspension.
+                __pendingEvents.persistIfDirty()
+                return inProgress.isEmpty
+            }
+            if idle {
+                endBackgroundTask()
+            }
+        }
+
+        private func endBackgroundTask() {
+            guard backgroundTask != .invalid else { return }
+            backgroundTasks.end(backgroundTask)
+            backgroundTask = .invalid
+        }
+    #else
+        private func beginBackgroundTask() {}
+        private func endBackgroundTaskIfIdle() {}
+    #endif
 }

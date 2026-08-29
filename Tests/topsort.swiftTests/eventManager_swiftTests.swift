@@ -459,6 +459,69 @@ class EventManagerTests: XCTestCase {
         waitForDiscard(discards, .retriesExhausted, 2)
     }
 
+    #if canImport(UIKit) && !os(watchOS)
+        /// Records begin/end; a test bundle has no UIApplication, so the real provider cannot be
+        /// observed here.
+        private final class MockBackgroundTasks: BackgroundTaskProviding {
+            var begun = 0
+            var ended: [UIBackgroundTaskIdentifier] = []
+            var expiration: (() -> Void)?
+            func begin(name _: String, expiration: @escaping () -> Void) -> UIBackgroundTaskIdentifier {
+                begun += 1
+                self.expiration = expiration
+                return UIBackgroundTaskIdentifier(rawValue: 42)
+            }
+
+            func end(_ task: UIBackgroundTaskIdentifier) {
+                ended.append(task)
+            }
+        }
+
+        /// The background flush must keep the process alive until the request it started returns.
+        func testBackgroundFlushHoldsABackgroundTaskUntilTheSendCompletes() {
+            let tasks = MockBackgroundTasks()
+            eventManager.backgroundTasks = tasks
+            mockClient.deferCallbacks = true
+            eventManager.flushAt = 100
+            eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)))
+
+            NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+
+            XCTAssertEqual(mockClient.postCallCount, 1)
+            XCTAssertEqual(tasks.begun, 1)
+            XCTAssertTrue(eventManager.isHoldingBackgroundTask, "task should be held while the send is in flight")
+
+            mockClient.completeDeferredPosts()
+            let released = NSPredicate { _, _ in !self.eventManager.isHoldingBackgroundTask }
+            wait(for: [expectation(for: released, evaluatedWith: nil)], timeout: 3)
+            XCTAssertEqual(tasks.ended, [UIBackgroundTaskIdentifier(rawValue: 42)])
+        }
+
+        /// Nothing in flight after the flush: the task is released right away.
+        func testBackgroundFlushReleasesTheTaskWhenNothingIsInFlight() {
+            let tasks = MockBackgroundTasks()
+            eventManager.backgroundTasks = tasks
+            NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+            XCTAssertEqual(tasks.begun, 1)
+            XCTAssertFalse(eventManager.isHoldingBackgroundTask)
+            XCTAssertEqual(tasks.ended.count, 1)
+        }
+
+        /// The system's expiry handler must release the task even with sends still in flight.
+        func testBackgroundTaskExpiryReleasesTheTask() {
+            let tasks = MockBackgroundTasks()
+            eventManager.backgroundTasks = tasks
+            mockClient.deferCallbacks = true
+            eventManager.flushAt = 100
+            eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)))
+            NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+            XCTAssertTrue(eventManager.isHoldingBackgroundTask)
+            tasks.expiration?()
+            XCTAssertFalse(eventManager.isHoldingBackgroundTask)
+            mockClient.completeDeferredPosts()
+        }
+    #endif
+
     private static func pendingRecordsOnDisk() -> Int {
         let path = PathHelper.path(for: "com.topsort.analytics.pending-events.plist")
         return FilePersistedValue<[UUID: PendingEvents]>(storePath: path).wrappedValue?.count ?? 0
