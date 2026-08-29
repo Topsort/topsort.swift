@@ -10,7 +10,7 @@
 
         override func setUp() {
             super.setUp()
-            mockClient = MockHTTPClient(apiKey: nil, postResult: .success(Data()))
+            mockClient = MockHTTPClient(apiKey: "test-key", postResult: .success(Data()))
             mockNetwork = MockNetworkMonitor()
             eventManager = EventManager.shared
             eventManager.client = mockClient

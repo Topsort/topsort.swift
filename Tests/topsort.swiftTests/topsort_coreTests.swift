@@ -6,7 +6,7 @@ class TopsortCoreTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        mockClient = MockHTTPClient(apiKey: nil, postResult: .success(Data()))
+        mockClient = MockHTTPClient(apiKey: "test-key", postResult: .success(Data()))
         EventManager.shared.client = mockClient
         EventManager.shared._eventQueue = []
         EventManager.shared._pendingEvents = [:]
@@ -163,7 +163,7 @@ class TopsortCoreTests: XCTestCase {
         // Push without triggering auto-send (flushAt = 1 from setUp, so it will send)
         // Instead, verify flush() itself works by checking mock is called
         EventManager.shared._eventQueue = []
-        mockClient = MockHTTPClient(apiKey: nil, postResult: .success(Data()))
+        mockClient = MockHTTPClient(apiKey: "test-key", postResult: .success(Data()))
         EventManager.shared.client = mockClient
         EventManager.shared.push(event: .impression(event))
 
