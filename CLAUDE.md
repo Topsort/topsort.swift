@@ -6,8 +6,8 @@ Swift SDK for Topsort retail media: auctions, event tracking, and banner ads.
 
 - **Two SPM libraries**: `Topsort` (core) and `TopsortBanners` (SwiftUI UI components)
 - **Zero external dependencies** — pure Swift/Foundation/SwiftUI
-- **Platforms**: iOS 15+, macOS 12+, tvOS 11+, watchOS 7.1+
-- **Swift tools version**: 5.3
+- **Platforms**: iOS 15+, macOS 12+
+- **Swift tools version**: 5.9 (kept below 6.0 to stay in Swift 5 language mode; the sources use typed throws, so a Swift 6 toolchain is required to build)
 
 ## Build & Test
 

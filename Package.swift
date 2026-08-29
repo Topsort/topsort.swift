@@ -1,4 +1,4 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -6,10 +6,8 @@ import PackageDescription
 let package = Package(
     name: "Topsort",
     platforms: [
-        .macOS("12.00"),
-        .iOS("15.0"),
-        .tvOS("11.0"),
-        .watchOS("7.1"),
+        .macOS(.v12),
+        .iOS(.v15),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.

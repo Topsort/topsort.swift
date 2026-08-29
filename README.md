@@ -1,8 +1,8 @@
 # topsort.swift
 
 [![Build](https://github.com/Topsort/topsort.swift/actions/workflows/test.yml/badge.svg)](https://github.com/Topsort/topsort.swift/actions/workflows/test.yml)
-[![Swift 5.3+](https://img.shields.io/badge/Swift-5.3+-orange.svg)](https://swift.org)
-[![Platforms](https://img.shields.io/badge/Platforms-iOS%2015+%20|%20macOS%2012+%20|%20tvOS%2011+%20|%20watchOS%207.1+-blue.svg)](https://github.com/Topsort/topsort.swift)
+[![Swift 6 toolchain](https://img.shields.io/badge/Swift-6%20toolchain%20(Xcode%2016+)-orange.svg)](https://swift.org)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS%2015+%20|%20macOS%2012+-blue.svg)](https://github.com/Topsort/topsort.swift)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![SPM Compatible](https://img.shields.io/badge/SPM-Compatible-brightgreen.svg)](https://swift.org/package-manager/)
 
@@ -198,8 +198,8 @@ let banner = TopsortBanner(bannerAuctionBuilder: builder, topsort: mock)
 
 ## Requirements
 
-- Swift 5.3+
-- iOS 15.0+ / macOS 12.0+ / tvOS 11.0+ / watchOS 7.1+
+- Swift 6 toolchain (Xcode 16+)
+- iOS 15.0+ / macOS 12.0+
 - No external dependencies
 
 ## Contributing
