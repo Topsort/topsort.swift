@@ -73,6 +73,10 @@ struct MyApp: App {
 }
 ```
 
+#### Who the events belong to
+
+Events carry `opaqueUserId`. Pass your own with `Topsort.shared.set(opaqueUserId:)` whenever you have one — logged in or not — so Topsort can attribute and audience-match. Without one the SDK mints a UUID and, by default, stores it so the device keeps a single identity across launches. That stored id is personal data under most privacy regimes; for a signed-out user or withdrawn consent, configure `identity = .ephemeral`: the id then lives only for the process, the id itself is never stored (queued events that carry it are, until sent), and any stored id is deleted. Set your own id after `configure`, not before. Events are still delivered and billed; they will not audience-match.
+
 ### 2. Run Auctions
 
 Request sponsored listings or banner placements (1-5 auctions per request):
@@ -205,6 +209,7 @@ Topsort (core)              TopsortBanners (UI)
 | `flushAt` | `Int` | `30` | Number of events that triggers a flush (at least 1) |
 | `flushInterval` | `TimeInterval` | `30` | Seconds between automatic flushes (greater than 0) |
 | `logLevel` | `LogLevel` | `.warning` | Log verbosity: `.none`, `.error`, `.warning`, `.debug` |
+| `identity` | `Identity` | `.persisted` | What happens to a minted user id: `.persisted` (written to disk, reused across launches) or `.ephemeral` (this process only; the stored id is removed) |
 
 ## How Events Are Delivered
 
