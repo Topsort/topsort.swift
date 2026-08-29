@@ -31,6 +31,25 @@ class EventManagerTests: XCTestCase {
         XCTAssertEqual(mockClient.apiKey, "test-key")
     }
 
+    func testConfigureRejectsFlushAtBelowOne() {
+        XCTAssertThrowsError(try eventManager.configure(apiKey: "k", url: nil, flushAt: 0)) { error in
+            guard case .invalidFlushAt(0) = error as? ConfigurationError else {
+                return XCTFail("unexpected error \(error)")
+            }
+        }
+        XCTAssertEqual(eventManager.flushAt, 1, "a rejected value must not be applied")
+    }
+
+    func testConfigureRejectsNonPositiveFlushInterval() {
+        let before = eventManager.flushInterval
+        XCTAssertThrowsError(try eventManager.configure(apiKey: "k", url: nil, flushInterval: 0)) { error in
+            guard case .invalidFlushInterval(0) = error as? ConfigurationError else {
+                return XCTFail("unexpected error \(error)")
+            }
+        }
+        XCTAssertEqual(eventManager.flushInterval, before, "a rejected value must not be applied")
+    }
+
     func testConfigureUpdatesURL() throws {
         try eventManager.configure(apiKey: "test-key", url: "https://custom.api.com/v2")
         XCTAssertEqual(eventManager.url.absoluteString, "https://custom.api.com/v2/events")

@@ -2,12 +2,18 @@ import Foundation
 
 public enum ConfigurationError: LocalizedError {
     case invalidURL(String)
+    case invalidFlushAt(Int)
+    case invalidFlushInterval(TimeInterval)
     case notConfigured
 
     public var errorDescription: String? {
         switch self {
         case let .invalidURL(url):
             return "Invalid Topsort API URL: \(url)"
+        case let .invalidFlushAt(value):
+            return "flushAt must be at least 1, got \(value)"
+        case let .invalidFlushInterval(value):
+            return "flushInterval must be greater than 0, got \(value)"
         case .notConfigured:
             return "Topsort SDK is not configured. Call Topsort.shared.configure(apiKey:) before use."
         }

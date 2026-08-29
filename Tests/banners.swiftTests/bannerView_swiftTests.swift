@@ -131,6 +131,17 @@ class TopsortBannerTests: XCTestCase {
         XCTAssertNil(auction.geoTargeting)
     }
 
+    /// The auction must carry the same opaqueUserId the events will, or the banner's
+    /// impressions and clicks cannot be joined to the auction that produced them.
+    func testBannerAuctionBuilderCarriesOpaqueUserId() {
+        let builder = BannerAuctionBuilder(slotId: "home", deviceType: "mobile")
+        XCTAssertEqual(builder.build(opaqueUserId: "u1").opaqueUserId, "u1")
+        XCTAssertEqual(builder.build().opaqueUserId, Topsort.shared.opaqueUserId)
+
+        let mock = MockTopsort(executeAuctionsMockResponse: AuctionResponse(results: []))
+        XCTAssertEqual(TopsortBanner(bannerAuctionBuilder: builder, topsort: mock).auction.opaqueUserId, mock.opaqueUserId)
+    }
+
     func testBannerAuctionBuilderWithProducts() throws {
         let products = try AuctionProducts(ids: ["p1", "p2"])
         let builder = BannerAuctionBuilder(slotId: "s1", deviceType: "desktop")

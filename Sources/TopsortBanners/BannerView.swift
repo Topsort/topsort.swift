@@ -84,8 +84,8 @@ public struct BannerAuctionBuilder {
         self.deviceType = deviceType
     }
 
-    public func build() -> Auction {
-        Auction(type: "banners", slots: 1, slotId: slotId, device: deviceType, products: products, category: category, searchQuery: searchQuery, geoTargeting: geoTargeting)
+    public func build(opaqueUserId: String = Topsort.shared.opaqueUserId) -> Auction {
+        Auction(type: "banners", slots: 1, slotId: slotId, device: deviceType, products: products, category: category, searchQuery: searchQuery, geoTargeting: geoTargeting, opaqueUserId: opaqueUserId)
     }
 }
 
@@ -126,7 +126,7 @@ public struct TopsortBanner: View {
         topsort: TopsortProtocol = Topsort.shared
     ) {
         self.topsort = topsort
-        auction = bannerAuctionBuilder.build()
+        auction = bannerAuctionBuilder.build(opaqueUserId: topsort.opaqueUserId)
     }
 
     private func trackImpression(resolvedBidId: String) {
