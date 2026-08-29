@@ -84,4 +84,31 @@ class FilePersistedValueDeferTests: XCTestCase {
         let reloaded = FilePersistedValue<Int>(storePath: path)
         XCTAssertEqual(reloaded.wrappedValue, 77)
     }
+
+    // MARK: - Pending-set persistence
+
+    /// What the pipeline writes on one launch must load unchanged on the next.
+    func testPendingSetRoundTripsThroughDisk() throws {
+        let id = UUID()
+        let body = try JSONEncoder().encode(Events(impressions: [Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)]))
+        let record = PendingEvents(id: id, data: body, createdAt: Date(timeIntervalSince1970: 1_700_000_000), retries: 3, lastRetry: Date(timeIntervalSince1970: 1_700_000_100))
+        FilePersistedValue<[UUID: PendingEvents]>(storePath: path).wrappedValue = [id: record]
+        wait(for: [expectation(for: NSPredicate { _, _ in FileManager.default.fileExists(atPath: self.path) }, evaluatedWith: nil)], timeout: 2)
+
+        let loaded = try XCTUnwrap(FilePersistedValue<[UUID: PendingEvents]>(storePath: path).wrappedValue?[id])
+        XCTAssertEqual(loaded.id, id)
+        XCTAssertEqual(loaded.data, body)
+        XCTAssertEqual(loaded.createdAt, record.createdAt)
+        XCTAssertEqual(loaded.retries, 3)
+        XCTAssertEqual(loaded.lastRetry, record.lastRetry)
+        XCTAssertEqual(loaded.eventCount, 1)
+    }
+
+    /// The on-disk shape has not changed since 1.0.0. Changing it means records written by an
+    /// older version stop loading, so it needs a migration, not just a new field.
+    func testPendingRecordSchemaIsUnchangedSince1_0_0() throws {
+        let record = PendingEvents(id: UUID(), data: Data(), createdAt: Date(), retries: 0, lastRetry: Date())
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(record)) as? [String: Any])
+        XCTAssertEqual(Set(json.keys), ["id", "data", "createdAt", "retries", "lastRetry"])
+    }
 }

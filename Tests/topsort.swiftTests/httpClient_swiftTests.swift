@@ -215,14 +215,13 @@ class MockURLProtocol: URLProtocol {
 
 class HTTPClientIntegrationTests: XCTestCase {
     var client: HTTPClient!
+    let url = URL(string: "https://api.example.com/v2/events")!
 
     override func setUp() {
         super.setUp()
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockURLProtocol.self]
-        // We need to create HTTPClient with our custom session
-        // Since HTTPClient creates its own session, we test via the callback path
-        client = HTTPClient(apiKey: "test-key")
+        client = HTTPClient(apiKey: "test-key", configuration: config)
     }
 
     override func tearDown() {
@@ -231,63 +230,95 @@ class HTTPClientIntegrationTests: XCTestCase {
         super.tearDown()
     }
 
-    func testPostCallbackSuccess() throws {
-        let url = try XCTUnwrap(URL(string: "https://api.example.com/v2/events"))
-        let exp = expectation(description: "callback")
-
-        // HTTPClient uses its own ephemeral session, so URLProtocol won't intercept.
-        // Instead, test the callback contract by verifying the mock client pattern works.
-        let mock = MockHTTPClient(apiKey: "key", postResult: .success(Data("{\"ok\":true}".utf8)))
-        mock.post(url: url, data: Data()) { result in
-            switch result {
-            case .success:
-                break // expected
-            case .failure:
-                XCTFail("Expected success")
-            }
-            exp.fulfill()
+    private func respond(_ status: Int, body: String? = nil, capture: ((URLRequest) -> Void)? = nil) {
+        MockURLProtocol.requestHandler = { request in
+            capture?(request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+            return (response, body.map { Data($0.utf8) })
         }
-        wait(for: [exp], timeout: 2)
-        XCTAssertTrue(mock.postCalled)
     }
 
-    func testPostCallbackFailure() throws {
-        let url = try XCTUnwrap(URL(string: "https://api.example.com/v2/events"))
+    private func post(_ data: Data = Data("{}".utf8)) -> Result<Data?, HTTPClientError> {
         let exp = expectation(description: "callback")
-
-        let mock = MockHTTPClient(apiKey: "key", postResult: .failure(.statusCode(code: 500, data: nil)))
-        mock.post(url: url, data: Data()) { result in
-            switch result {
-            case .success:
-                XCTFail("Expected failure")
-            case let .failure(error):
-                if case let .statusCode(code, _) = error {
-                    XCTAssertEqual(code, 500)
-                }
-            }
-            exp.fulfill()
-        }
-        wait(for: [exp], timeout: 2)
+        var result: Result<Data?, HTTPClientError>!
+        client.post(url: url, data: data) { result = $0; exp.fulfill() }
+        wait(for: [exp], timeout: 5)
+        return result
     }
 
-    func testAsyncPostSuccess() async throws {
-        let url = try XCTUnwrap(URL(string: "https://api.example.com/v2/events"))
-        let mock = MockHTTPClient(apiKey: "key", postResult: .success(Data("{\"ok\":true}".utf8)))
-        let data = try await mock.asyncPost(url: url, data: Data())
-        XCTAssertNotNil(data)
-        XCTAssertTrue(mock.postCalled)
+    // MARK: post (the events pipeline's path)
+
+    func testPostSendsTheBodyWithAuthAndUserAgentHeaders() throws {
+        var seen: URLRequest?
+        respond(200, body: "{}", capture: { seen = $0 })
+        _ = post(Data("{\"impressions\":[]}".utf8))
+        let request = try XCTUnwrap(seen)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "analytics-swift/\(__analytics_version)")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json; charset=utf-8")
+        // URLProtocol exposes the body as a stream; read it back.
+        let stream = try XCTUnwrap(request.httpBodyStream)
+        stream.open()
+        var buffer = [UInt8](repeating: 0, count: 64)
+        let read = stream.read(&buffer, maxLength: buffer.count)
+        XCTAssertEqual(String(decoding: buffer[0 ..< max(read, 0)], as: UTF8.self), "{\"impressions\":[]}")
     }
 
-    func testAsyncPostThrowsOnError() async throws {
-        let url = try XCTUnwrap(URL(string: "https://api.example.com/v2/events"))
-        let mock = MockHTTPClient(apiKey: "key", postResult: .failure(.statusCode(code: 401, data: nil)))
+    func testPost2xxIsSuccessWithTheBody() {
+        respond(200, body: "{\"ok\":true}")
+        guard case let .success(data) = post() else { return XCTFail("expected success") }
+        XCTAssertEqual(data, Data("{\"ok\":true}".utf8))
+    }
+
+    func testPost4xxMapsToStatusCodeWithParsedTopsortError() {
+        respond(401, body: "{\"message\":\"bad key\",\"errCode\":\"invalid_api_key\"}")
+        guard case let .failure(.statusCode(code, data)) = post() else { return XCTFail("expected statusCode") }
+        XCTAssertEqual(code, 401)
+        guard case let .topsortError(error) = data else { return XCTFail("expected a parsed TopsortError, got \(String(describing: data))") }
+        XCTAssertEqual(error.message, "bad key")
+        guard case .invalidApiKey = error.errCode else { return XCTFail("expected invalidApiKey, got \(error.errCode)") }
+    }
+
+    func testPost5xxMapsToStatusCode() {
+        respond(503)
+        guard case let .failure(.statusCode(code, data)) = post() else { return XCTFail("expected statusCode") }
+        XCTAssertEqual(code, 503)
+        if case let .data(body) = data { XCTAssertTrue(body.isEmpty) } // URLSession hands back empty Data, not nil
+    }
+
+    func testPostTransportFailureMapsToUnknown() {
+        MockURLProtocol.requestHandler = { _ in throw URLError(.notConnectedToInternet) }
+        guard case let .failure(.unknown(error, _)) = post() else { return XCTFail("expected unknown") }
+        XCTAssertEqual((error as? URLError)?.code, .notConnectedToInternet)
+    }
+
+    // MARK: asyncPost (the auctions path)
+
+    func testAsyncPostReturnsTheBodyOn2xx() async throws {
+        respond(200, body: "{\"results\":[]}")
+        let data = try await client.asyncPost(url: url, data: Data("{}".utf8))
+        XCTAssertEqual(data, Data("{\"results\":[]}".utf8))
+    }
+
+    func testAsyncPostThrowsStatusCodeOn4xx() async {
+        respond(400, body: "{\"message\":\"nope\",\"errCode\":\"bad_request\"}")
         do {
-            _ = try await mock.asyncPost(url: url, data: Data())
-            XCTFail("Should have thrown")
+            _ = try await client.asyncPost(url: url, data: Data("{}".utf8))
+            XCTFail("should have thrown")
         } catch {
-            if case let .statusCode(code, _) = error {
-                XCTAssertEqual(code, 401)
-            }
+            guard case let .statusCode(code, _) = error else { return XCTFail("expected statusCode, got \(error)") }
+            XCTAssertEqual(code, 400)
+        }
+    }
+
+    func testAsyncPostThrowsUnknownOnTransportFailure() async {
+        MockURLProtocol.requestHandler = { _ in throw URLError(.timedOut) }
+        do {
+            _ = try await client.asyncPost(url: url, data: Data("{}".utf8))
+            XCTFail("should have thrown")
+        } catch {
+            guard case .unknown = error else { return XCTFail("expected unknown, got \(error)") }
         }
     }
 }

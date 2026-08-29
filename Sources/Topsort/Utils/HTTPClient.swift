@@ -51,9 +51,11 @@ extension HTTPClientError {
 class HTTPClient {
     var apiKey: String?
     private let session: URLSession
-    init(apiKey: String?) {
+    /// `configuration` exists so tests can install a `URLProtocol`; production always uses the
+    /// ephemeral default.
+    init(apiKey: String?, configuration: URLSessionConfiguration = .ephemeral) {
         self.apiKey = apiKey
-        session = URLSession(configuration: .ephemeral, delegate: nil, delegateQueue: nil)
+        session = URLSession(configuration: configuration, delegate: nil, delegateQueue: nil)
     }
 
     func asyncPost(url: URL, data: Data, timeoutInterval: TimeInterval = 60) async throws(HTTPClientError) -> Data? {
