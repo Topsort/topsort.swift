@@ -21,7 +21,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Topsort/topsort.swift.git", from: "1.2.0"), // x-release-please-version
+    .package(url: "https://github.com/Topsort/topsort.swift.git", from: "1.3.0"), // x-release-please-version
 ]
 ```
 
