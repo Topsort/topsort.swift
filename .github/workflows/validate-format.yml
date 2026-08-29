@@ -11,5 +11,5 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: swiftformat --lint --reporter github-actions-log .
