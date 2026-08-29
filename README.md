@@ -259,6 +259,12 @@ final class StubTopsort: TopsortProtocol {
 let banner = TopsortBanner(bannerAuctionBuilder: builder, topsort: StubTopsort(response: canned))
 ```
 
+## Privacy Manifest
+
+The `Topsort` library ships a `PrivacyInfo.xcprivacy` resource declaring what it sends to Topsort: a user identifier (`opaqueUserId`, a random UUID the SDK generates unless you call `set(opaqueUserId:)`), purchase history (`track(purchase:)`), product interaction (impressions, clicks, page views), and search history (`searchQuery` on auctions and placements). All four are declared as linked to the user, not used for tracking, with purposes *Analytics*, *Developer's Advertising or Marketing* and *Third-Party Advertising* — the ads are the marketplace's vendors', served by Topsort. It accesses no required-reason APIs and lists no tracking domains.
+
+Xcode merges this into your app's privacy report, but App Store Connect's questionnaire is answered from your own manifest: declare the same data types there, and only mark them as tracking if you pass an identifier that is used across apps or sites. Purchase history does not apply if you never call `track(purchase:)`, nor search history if you never pass `searchQuery`. `AuctionGeoTargeting.location` is a free-form string the SDK does not classify: if you derive it from the user's location, declare *Coarse Location* yourself.
+
 ## Requirements
 
 - Swift 6 toolchain (Xcode 16+)
