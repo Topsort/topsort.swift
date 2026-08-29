@@ -125,7 +125,6 @@ class EventManager {
     var client: HTTPClient
 
     func configure(apiKey: String, url: String?, flushAt: Int? = nil, flushInterval: TimeInterval? = nil) throws(ConfigurationError) {
-        client.apiKey = apiKey
         if let url = url {
             guard let parsedURL = URL(string: "\(url)/events") else {
                 throw .invalidURL(url)
@@ -133,6 +132,7 @@ class EventManager {
             self.url = parsedURL
         }
         serialQueue.sync {
+            self.client.apiKey = apiKey
             if let flushAt = flushAt {
                 self.flushAt = flushAt
             }
@@ -175,6 +175,10 @@ class EventManager {
 
     /// Must be called on serialQueue
     private func performSend() {
+        guard client.apiKey != nil else {
+            Logger.debug("Not configured yet — deferring event send")
+            return
+        }
         #if canImport(Network)
             guard networkMonitor.isConnected else {
                 Logger.debug("Offline — deferring event send")
@@ -233,6 +237,10 @@ class EventManager {
 
     /// Must be called on serialQueue
     private func performRetry() {
+        guard client.apiKey != nil else {
+            Logger.debug("Not configured yet — deferring event retry")
+            return
+        }
         #if canImport(Network)
             guard networkMonitor.isConnected else {
                 Logger.debug("Offline — deferring event retry")

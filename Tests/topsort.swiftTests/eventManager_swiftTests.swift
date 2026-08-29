@@ -8,7 +8,7 @@ class EventManagerTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        mockClient = MockHTTPClient(apiKey: nil, postResult: .success(Data()))
+        mockClient = MockHTTPClient(apiKey: "test-key", postResult: .success(Data()))
         eventManager = EventManager.shared
         eventManager.client = mockClient
         // Reset singleton state to isolate tests
@@ -116,6 +116,55 @@ class EventManagerTests: XCTestCase {
 
         // 400 is non-retriable — event should be sent once and dropped
         XCTAssertEqual(mockClient.postCallCount, 1)
+    }
+
+    /// A permanent 4xx must not enter the retry queue at all. Before 4xx was classified
+    /// correctly a bad API key made every batch retriable, so each one spent 50 retries
+    /// over ~16 hours and then sat in the plist as a zombie.
+    func testHTTP401DropsBatchInsteadOfQueueingForRetry() {
+        mockClient.postResult = .failure(.statusCode(code: 401, data: nil))
+
+        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        eventManager.push(event: .impression(event))
+
+        let dropped = NSPredicate { _, _ in
+            self.mockClient.postCallCount == 1 && self.eventManager._pendingEvents?.isEmpty == true
+        }
+        wait(for: [expectation(for: dropped, evaluatedWith: nil)], timeout: 3)
+    }
+
+    /// Queue and pending state are loaded from disk at init, and the periodic timer, the
+    /// lifecycle observer and the connectivity monitor can all flush before the host has
+    /// called configure(). A POST without a key is a 401, which is permanent, so the batch
+    /// would be dropped instead of waiting for the key.
+    func testNothingIsSentBeforeAnApiKeyIsConfigured() {
+        mockClient.apiKey = nil
+        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        let stale = PendingEvents(id: UUID(), data: Data(), createdAt: Date(), retries: 1, lastRetry: Date.distantPast)
+        eventManager._pendingEvents = [stale.id: stale]
+        eventManager.push(event: .impression(event))
+
+        eventManager.flushAndPersist()
+        XCTAssertEqual(mockClient.postCallCount, 0, "sent without an API key")
+        XCTAssertEqual(eventManager._eventQueue?.count, 1)
+        XCTAssertEqual(eventManager._pendingEvents?.count, 1)
+
+        mockClient.apiKey = "test-key"
+        eventManager.flushAndPersist()
+        XCTAssertEqual(mockClient.postCallCount, 2, "queue and pending batch were not sent once configured")
+    }
+
+    /// Negative validation for the above: a 5xx must still be queued for retry.
+    func testHTTP503QueuesBatchForRetry() {
+        mockClient.postResult = .failure(.statusCode(code: 503, data: nil))
+
+        let event = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        eventManager.push(event: .impression(event))
+
+        let queued = NSPredicate { _, _ in
+            self.eventManager._pendingEvents?.values.first?.retries == 1
+        }
+        wait(for: [expectation(for: queued, evaluatedWith: nil)], timeout: 3)
     }
 
     // MARK: - Batching
