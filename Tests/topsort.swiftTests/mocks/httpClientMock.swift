@@ -25,6 +25,17 @@ class MockHTTPClient: HTTPClient {
     }
 
     var postResult: Result<Data?, HTTPClientError>?
+    /// When set, `post` holds its callbacks until `completeDeferredPosts()` — for tests that
+    /// need a request to still be in flight.
+    var deferCallbacks = false
+    private var _deferred: [(Result<Data?, HTTPClientError>) -> Void] = []
+
+    func completeDeferredPosts() {
+        let callbacks = lock.withLock { let c = _deferred; _deferred = []; return c }
+        for callback in callbacks {
+            callback(postResult ?? .success(nil))
+        }
+    }
 
     init(apiKey: String?, postResult: Result<Data?, HTTPClientError>?) {
         self.postResult = postResult
@@ -54,7 +65,9 @@ class MockHTTPClient: HTTPClient {
 
     override func post(url _: URL, data: Data, callback: @escaping (Result<Data?, HTTPClientError>) -> Void) {
         recordPost(data: data)
-        if let result = postResult {
+        if deferCallbacks {
+            lock.withLock { _deferred.append(callback) }
+        } else if let result = postResult {
             callback(result)
         }
     }
