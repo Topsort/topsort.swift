@@ -15,10 +15,20 @@ class EventManagerTests: XCTestCase {
         eventManager._eventQueue = []
         eventManager._pendingEvents = [:]
         eventManager.flushAt = 1 // Send immediately for existing tests
+        // Isolate from the environment: the real NWPathMonitor can report the simulator as
+        // offline for the first seconds of a run, and the singleton's periodic flush must not
+        // land inside a "nothing was sent" window.
+        #if canImport(Network)
+            let mockNetwork = MockNetworkMonitor()
+            mockNetwork.isConnected = true
+            eventManager.networkMonitor = mockNetwork
+        #endif
+        XCTAssertNoThrow(try eventManager.configure(apiKey: "test-key", url: nil, flushInterval: 3600))
         Topsort.shared.set(opaqueUserId: "test-user")
     }
 
     override func tearDown() {
+        XCTAssertNoThrow(try eventManager.configure(apiKey: "test-key", url: nil, flushInterval: 30))
         eventManager = nil
         mockClient = nil
         super.tearDown()
