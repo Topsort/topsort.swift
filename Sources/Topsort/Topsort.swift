@@ -43,7 +43,8 @@ public class Topsort: TopsortProtocol {
             apiKey: configuration.apiKey,
             url: configuration.url,
             flushAt: configuration.flushAt,
-            flushInterval: configuration.flushInterval
+            flushInterval: configuration.flushInterval,
+            onEventsDiscarded: configuration.onEventsDiscarded
         )
         Logger.logLevel = configuration.logLevel
         try AuctionManager.shared.configure(apiKey: configuration.apiKey, url: configuration.url)
