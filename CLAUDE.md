@@ -35,7 +35,8 @@ Events are queued → periodically flushed (every 30s) → batched into POSTs of
 - **Retry**: exponential backoff `min(10 * 2^retries, 1200)` seconds, max 50 retries, max 10 concurrent; a batch that exhausts its retries is dropped
 - **Non-retriable**: all 4xx except 408 and 429. 5xx and transport failures retry
 - **Bounds**: queue capped at 5000 events (oldest shed first); each POST carries at most 500 events
-- **Queue/pending state**: persisted to plist files in app Documents directory
+- **Flush triggers**: queue reaches `flushAt` (default 30), the `flushInterval` timer, `flush()`, background/terminate, connectivity restored. `configure` rejects `flushAt < 1` and `flushInterval <= 0`
+- **Queue/pending state**: persisted to plist files in `Application Support/com.topsort.analytics/` (migrated from Documents on first launch; `PathHelper.swift`), debounced 5 s, synchronous on background/terminate
 
 ### Auction Pipeline (AuctionManager)
 
@@ -45,9 +46,10 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 
 `TopsortBanner` is a SwiftUI `View` with an internal `@MainActor ViewModel`. It:
 1. Runs an auction via `TopsortProtocol`
-2. Loads the winning asset URL via `AsyncImage`
-3. Auto-tracks impressions on appear, clicks on tap
-4. Provides fluent callbacks: `.buttonClickedAction()`, `.onError()`, `.onNoWinners()`, `.onImageLoad()`
+2. Loads the winning asset URL via `RemoteImage` (an ephemeral `URLSession` loader, not `AsyncImage`)
+3. Tracks the impression when the image has loaded (not on appear), clicks on tap
+4. Builds the auction with the injected `TopsortProtocol`'s `opaqueUserId`
+5. Provides fluent callbacks: `.buttonClickedAction()`, `.onError()`, `.onNoWinners()`, `.onImageLoad()`
 
 `BannerAuctionBuilder` constructs the auction config (slotId, deviceType, products, category, etc.).
 
@@ -80,8 +82,9 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 | Max events per batch | 500 | `EventManager.swift` |
 | Max backoff | 1200s (20 min) | `EventManager.swift` |
 | Flush interval | 30s | `EventManager.swift` |
+| Flush threshold (`flushAt`) | 30 events | `Configuration.swift` |
 
-**Persistence files** (app Documents dir):
+**Persistence files** (`Application Support/com.topsort.analytics/`):
 - `com.topsort.analytics.opaque-user-id.plist`
 - `com.topsort.analytics.event-queue.plist`
 - `com.topsort.analytics.pending-events.plist`
@@ -92,6 +95,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 - **swiftformat** enforced in CI (default rules, no `.swiftformat` config file)
 - Source files: PascalCase (`EventManager.swift`, `BannerView.swift`)
 - Test targets: lowercase with dots (`topsort.swiftTests`, `banners.swiftTests`)
+- No `.swift-version` file: swiftformat reads it as the *language* version, and anything above 5.3 turns on rules the sources do not follow. The toolchain requirement lives in README and `Package.swift`
 
 ## CI (GitHub Actions)
 
