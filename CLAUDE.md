@@ -27,6 +27,8 @@ No Makefile, no Xcode project — SPM only.
 - `EventManager.shared` — fire-and-forget event tracking (impressions, clicks, purchases)
 - `AuctionManager.shared` — async/await auction requests
 
+**`TopsortClient`** (`TopsortClient.swift`) is the stateless alternative: one request per call over the same `HTTPClient` and `AuctionManager.executeAuctions` helper, nothing queued or persisted.
+
 **`TopsortProtocol`** defines the full public API surface. Used for DI/testability — `TopsortBanner` accepts any `TopsortProtocol` conformer (defaults to `Topsort.shared`).
 
 ### Event Pipeline (EventManager)
