@@ -31,7 +31,9 @@ public class Topsort: TopsortProtocol {
         identityLock.withLock {
             switch identity {
             case .ephemeral:
-                if let id = ephemeralOpaqueUserId { return id }
+                if let id = ephemeralOpaqueUserId {
+                    return id
+                }
                 let id = Self.newOpaqueUserId()
                 ephemeralOpaqueUserId = id
                 return id
@@ -64,7 +66,8 @@ public class Topsort: TopsortProtocol {
             url: configuration.url,
             flushAt: configuration.flushAt,
             flushInterval: configuration.flushInterval,
-            onEventsDiscarded: configuration.onEventsDiscarded
+            onEventsDiscarded: configuration.onEventsDiscarded,
+            onEventsDelivered: configuration.onEventsDelivered
         )
         Logger.logLevel = configuration.logLevel
         identityLock.withLock {

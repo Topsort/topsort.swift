@@ -109,6 +109,7 @@ class EventManager {
     private var inProgress: Set<UUID> = []
     private var queueAtCapacityLogged = false
     var onEventsDiscarded: ((DiscardReason, Int) -> Void)?
+    var onEventsDelivered: ((Int) -> Void)?
     var flushAt: Int = 30
     var flushInterval: TimeInterval = 30
     private var lifecycleObserver: LifecycleObserver?
@@ -159,7 +160,7 @@ class EventManager {
     var url: URL = EVENTS_TOPSORT_URL
     var client: HTTPClient
 
-    func configure(apiKey: String, url: String?, flushAt: Int? = nil, flushInterval: TimeInterval? = nil, onEventsDiscarded: ((DiscardReason, Int) -> Void)? = nil) throws(ConfigurationError) {
+    func configure(apiKey: String, url: String?, flushAt: Int? = nil, flushInterval: TimeInterval? = nil, onEventsDiscarded: ((DiscardReason, Int) -> Void)? = nil, onEventsDelivered: ((Int) -> Void)? = nil) throws(ConfigurationError) {
         if let flushAt = flushAt, flushAt < 1 {
             throw .invalidFlushAt(flushAt)
         }
@@ -175,6 +176,7 @@ class EventManager {
         serialQueue.sync {
             self.client.apiKey = apiKey
             self.onEventsDiscarded = onEventsDiscarded
+            self.onEventsDelivered = onEventsDelivered
             if let flushAt = flushAt {
                 self.flushAt = flushAt
             }
@@ -283,7 +285,8 @@ class EventManager {
             }
             switch result {
             case .success:
-                self.pendingEvents.removeValue(forKey: id)
+                let batch = self.pendingEvents.removeValue(forKey: id)
+                self.delivered(batch)
             case let .failure(error):
                 if error.isRetriable() {
                     if var pendingEvents = self.pendingEvents[id], pendingEvents.retries < MAX_RETRIES {
@@ -313,6 +316,23 @@ class EventManager {
     private func discarded(_ count: Int, reason: DiscardReason) {
         guard count > 0, let onEventsDiscarded else { return }
         onEventsDiscarded(reason, count)
+    }
+
+    /// Must be called on serialQueue, after the batch has left `pendingEvents`.
+    ///
+    /// The acknowledgement is the only evidence the SDK has that a batch landed, and it used to
+    /// leave no trace at all: a host whose network inspector did not show the response had no way
+    /// to tell a delivered batch from a stalled one except by waiting to see whether it was
+    /// re-sent.
+    ///
+    /// `eventCount` decodes the stored body, so nothing is counted unless someone is listening.
+    private func delivered(_ batch: PendingEvents?) {
+        guard onEventsDelivered != nil || Logger.logLevel >= .debug else { return }
+        // Same convention as `discarded`: a batch whose body no longer decodes still carried at
+        // least one event, so an acknowledged batch never reports zero.
+        let count = max(batch?.eventCount ?? 0, 1)
+        Logger.debug("Delivered \(count) event(s); \(pendingEvents.count) batch(es) still unacknowledged")
+        onEventsDelivered?(count)
     }
 
     /// Must be called on serialQueue
