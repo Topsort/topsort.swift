@@ -31,7 +31,9 @@ public class Topsort: TopsortProtocol {
         identityLock.withLock {
             switch identity {
             case .ephemeral:
-                if let id = ephemeralOpaqueUserId { return id }
+                if let id = ephemeralOpaqueUserId {
+                    return id
+                }
                 let id = Self.newOpaqueUserId()
                 ephemeralOpaqueUserId = id
                 return id
