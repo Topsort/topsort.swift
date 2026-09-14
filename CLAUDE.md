@@ -39,6 +39,7 @@ Events are queued → periodically flushed (every 30s) → batched into POSTs of
 - **Non-retriable**: all 4xx except 408 and 429. 5xx and transport failures retry
 - **Bounds**: queue capped at 5000 events (oldest shed first); each POST carries at most 500 events
 - **Flush triggers**: queue reaches `flushAt` (default 30), the `flushInterval` timer, `flush()`, background/terminate, connectivity restored. `configure` rejects `flushAt < 1` and `flushInterval <= 0`
+- **Host observability**: `onEventsDiscarded` (reason + count) for loss, `onEventsDelivered` (count) for acknowledgement. Both fire on the serial queue. Delivery is otherwise unreported, and an in-app network inspector may not show the response for the event session, so a delivered batch can look like a stalled one
 - **Queue/pending state**: persisted to plist files in `Application Support/com.topsort.analytics/` (migrated from Documents on first launch; `PathHelper.swift`). Both write atomically; the queue is debounced 5 s (synchronous on background/terminate), the pending set is written on every change — it is the at-least-once ledger
 
 ### Auction Pipeline (AuctionManager)
