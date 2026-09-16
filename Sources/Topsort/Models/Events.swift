@@ -122,13 +122,17 @@ public enum PageValue: Codable {
 
     /// Convenience: get the string value (nil if array).
     public var stringValue: String? {
-        if case let .string(s) = self { return s }
+        if case let .string(s) = self {
+            return s
+        }
         return nil
     }
 
     /// Convenience: get the array value (nil if string).
     public var arrayValue: [String]? {
-        if case let .array(arr) = self { return arr }
+        if case let .array(arr) = self {
+            return arr
+        }
         return nil
     }
 }
