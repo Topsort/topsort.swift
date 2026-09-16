@@ -10,6 +10,7 @@ enum EventItem: Codable {
     case impression(Event)
     case purchase(PurchaseEvent)
     case pageview(PageViewEvent)
+    case render(RenderEvent)
 }
 
 extension [EventItem] {
@@ -18,19 +19,22 @@ extension [EventItem] {
         var clicks: [Event] = []
         var purchases: [PurchaseEvent] = []
         var pageviews: [PageViewEvent] = []
+        var renders: [RenderEvent] = []
         for item in self {
             switch item {
             case let .impression(event): impressions.append(event)
             case let .click(event): clicks.append(event)
             case let .purchase(event): purchases.append(event)
             case let .pageview(event): pageviews.append(event)
+            case let .render(event): renders.append(event)
             }
         }
         return Events(
             impressions: impressions.isEmpty ? nil : impressions,
             clicks: clicks.isEmpty ? nil : clicks,
             purchases: purchases.isEmpty ? nil : purchases,
-            pageviews: pageviews.isEmpty ? nil : pageviews
+            pageviews: pageviews.isEmpty ? nil : pageviews,
+            renders: renders.isEmpty ? nil : renders
         )
     }
 }
@@ -49,6 +53,7 @@ struct PendingEvents: Codable {
         count += events.clicks?.count ?? 0
         count += events.purchases?.count ?? 0
         count += events.pageviews?.count ?? 0
+        count += events.renders?.count ?? 0
         return count
     }
 

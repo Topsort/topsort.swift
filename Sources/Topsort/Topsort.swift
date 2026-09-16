@@ -9,6 +9,7 @@ public protocol TopsortProtocol {
     func track(click event: Event)
     func track(purchase event: PurchaseEvent)
     func track(pageview event: PageViewEvent)
+    func track(render event: RenderEvent)
     func flush()
     func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse
 }
@@ -16,6 +17,7 @@ public protocol TopsortProtocol {
 /// Default implementation for backward compatibility with existing conformers.
 public extension TopsortProtocol {
     func track(pageview _: PageViewEvent) {}
+    func track(render _: RenderEvent) {}
 }
 
 public class Topsort: TopsortProtocol {
@@ -124,6 +126,14 @@ public class Topsort: TopsortProtocol {
             return
         }
         EventManager.shared.push(event: .pageview(event))
+    }
+
+    public func track(render event: RenderEvent) {
+        guard isConfigured else {
+            Logger.warning("track(render:) called before configure(). Event dropped.")
+            return
+        }
+        EventManager.shared.push(event: .render(event))
     }
 
     public func flush() {
