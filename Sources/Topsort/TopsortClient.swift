@@ -34,13 +34,14 @@ public struct TopsortClient {
     /// Reports events in one request. Nothing is retried: a thrown error means the caller still
     /// owns the events. Pass `opaqueUserId` to every event — the initializers' default reaches
     /// for `Topsort.shared`, which mints and persists a device id, so omitting it is not stateless.
-    public func send(impressions: [Event] = [], clicks: [Event] = [], purchases: [PurchaseEvent] = [], pageviews: [PageViewEvent] = []) async throws(HTTPClientError) {
-        guard !(impressions.isEmpty && clicks.isEmpty && purchases.isEmpty && pageviews.isEmpty) else { return }
+    public func send(impressions: [Event] = [], clicks: [Event] = [], purchases: [PurchaseEvent] = [], pageviews: [PageViewEvent] = [], renders: [RenderEvent] = []) async throws(HTTPClientError) {
+        guard !(impressions.isEmpty && clicks.isEmpty && purchases.isEmpty && pageviews.isEmpty && renders.isEmpty) else { return }
         let events = Events(
             impressions: impressions.isEmpty ? nil : impressions,
             clicks: clicks.isEmpty ? nil : clicks,
             purchases: purchases.isEmpty ? nil : purchases,
-            pageviews: pageviews.isEmpty ? nil : pageviews
+            pageviews: pageviews.isEmpty ? nil : pageviews,
+            renders: renders.isEmpty ? nil : renders
         )
         let body: Data
         do {

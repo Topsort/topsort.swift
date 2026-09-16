@@ -235,6 +235,64 @@ public struct Event: Codable {
     }
 }
 
+/// A render means an ad was inserted into the page (IAB "rendered"), reported separately from
+/// when it becomes visible (an impression). Renders are sponsored-only, so `resolvedBidId` is required.
+public struct RenderEvent: Codable {
+    /**
+     The `resolvedBidId` field received from the `/auctions` request.
+     */
+    let resolvedBidId: String
+
+    /**
+     RFC3339 formatted timestamp including UTC offset.
+     */
+    @TSDateValue
+    var occurredAt: Date
+
+    /**
+     The opaque user ID allows correlating user activity, such as Renders, Impressions, Clicks and Purchases, whether or not they
+     are actually logged in. It must be long lived (at least a year) so that Topsort can attribute purchases.
+     */
+    let opaqueUserId: String
+
+    /**
+     The marketplace's unique ID for the render. This field ensures the event reporting is idempotent in case there is
+     a network issue and the request is retried.
+     */
+    let id: String
+
+    let placement: Placement?
+
+    /// Page context for the event.
+    let page: Page?
+
+    /// Device type: "desktop" or "mobile".
+    let deviceType: String?
+
+    /// Channel: "onsite", "offsite", or "instore".
+    let channel: String?
+
+    public init(
+        resolvedBidId: String,
+        occurredAt: Date,
+        opaqueUserId: String = Topsort.shared.opaqueUserId,
+        placement: Placement? = nil,
+        page: Page? = nil,
+        deviceType: String? = nil,
+        channel: String? = nil,
+        id: String = UUID().uuidString
+    ) {
+        self.resolvedBidId = resolvedBidId
+        self.occurredAt = occurredAt
+        self.opaqueUserId = opaqueUserId
+        self.placement = placement
+        self.page = page
+        self.deviceType = deviceType
+        self.channel = channel
+        self.id = id
+    }
+}
+
 public struct PurchaseItem: Codable {
     /// The marketplace ID of the product being purchased.
     let productId: String
@@ -335,39 +393,53 @@ struct Events: Codable {
     let clicks: [Event]?
     let purchases: [PurchaseEvent]?
     let pageviews: [PageViewEvent]?
+    let renders: [RenderEvent]?
 
-    init(impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
+    init(impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
+        self.renders = renders
     }
 
-    init(impressions: [Event], clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
+    init(impressions: [Event], clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
+        self.renders = renders
     }
 
-    init(clicks: [Event], impressions: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
+    init(clicks: [Event], impressions: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
+        self.renders = renders
     }
 
-    init(purchases: [PurchaseEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, pageviews: [PageViewEvent]? = nil) {
+    init(purchases: [PurchaseEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
+        self.renders = renders
     }
 
-    init(pageviews: [PageViewEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil) {
+    init(pageviews: [PageViewEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, renders: [RenderEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
+        self.renders = renders
+    }
+
+    init(renders: [RenderEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
+        self.impressions = impressions
+        self.clicks = clicks
+        self.purchases = purchases
+        self.pageviews = pageviews
+        self.renders = renders
     }
 }

@@ -166,6 +166,7 @@ class APIContractEventTests: XCTestCase {
         XCTAssertEqual(try idField(Event(resolvedBidId: "bid", occurredAt: Date.now, id: id)), id)
         XCTAssertEqual(try idField(PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 1)], occurredAt: Date.now, id: id)), id)
         XCTAssertEqual(try idField(PageViewEvent(page: Page(type: "home", pageId: "home"), occurredAt: Date.now, id: id)), id)
+        XCTAssertEqual(try idField(RenderEvent(resolvedBidId: "bid", occurredAt: Date.now, id: id)), id)
         XCTAssertNotNil(UUID(uuidString: Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now).id), "the default must still mint a fresh UUID")
     }
 
@@ -312,6 +313,58 @@ class APIContractEventTests: XCTestCase {
         let events = items.toEvents()
 
         XCTAssertEqual(events.pageviews?.count, 1)
+        XCTAssertEqual(events.impressions?.count, 1)
+    }
+
+    // MARK: - Render event
+
+    func testRenderEventEncoding() throws {
+        let render = RenderEvent(
+            resolvedBidId: "bid-abc",
+            occurredAt: Date.now,
+            opaqueUserId: "user-123",
+            deviceType: "mobile",
+            channel: "onsite"
+        )
+
+        let data = try JSONEncoder().encode(render)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertEqual(json["resolvedBidId"] as? String, "bid-abc")
+        XCTAssertEqual(json["opaqueUserId"] as? String, "user-123")
+        XCTAssertEqual(json["deviceType"] as? String, "mobile")
+        XCTAssertEqual(json["channel"] as? String, "onsite")
+        XCTAssertNotNil(json["id"])
+        XCTAssertNotNil(json["occurredAt"])
+    }
+
+    // MARK: - Events batch with renders
+
+    func testEventsBatchIncludesRenders() throws {
+        let render = RenderEvent(resolvedBidId: "bid-abc", occurredAt: Date.now)
+        let events = Events(renders: [render])
+
+        let data = try JSONEncoder().encode(events)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertEqual((json["renders"] as? [Any])?.count, 1)
+    }
+
+    // MARK: - EventItem grouping with renders
+
+    func testEventItemGroupsRenders() {
+        Topsort.shared.set(opaqueUserId: "test-user")
+        let render = RenderEvent(resolvedBidId: "bid-abc", occurredAt: Date.now)
+        let impression = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+
+        let items: [EventItem] = [
+            .render(render),
+            .impression(impression),
+        ]
+
+        let events = items.toEvents()
+
+        XCTAssertEqual(events.renders?.count, 1)
         XCTAssertEqual(events.impressions?.count, 1)
     }
 }
