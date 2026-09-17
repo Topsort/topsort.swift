@@ -73,6 +73,31 @@ class TopsortBannerTests: XCTestCase {
         XCTAssertTrue(mockTopsort.trackedImpressions.isEmpty, "Impression should not be tracked on auction response — only on image load")
     }
 
+    /// The render must fire as soon as the winning creative is resolved (before it has loaded,
+    /// let alone become visible) — not on image load, which is when the impression fires.
+    func testExecuteAuctionsTracksRenderForWinner() async throws {
+        let asset = Asset(url: "https://example.com", content: nil)
+        let winner = Winner(rank: 1, asset: [asset], type: "type", id: "id", resolvedBidId: "bid-id", campaignId: nil)
+        let auctionResult = AuctionResult(resultType: "result_type", winners: [winner], error: false)
+        let auctionResponse = AuctionResponse(results: [auctionResult])
+
+        let mockTopsort = MockTopsort(executeAuctionsMockResponse: auctionResponse)
+        var config = Configuration(apiKey: "test_api_key")
+        config.url = "test_url"
+        try Topsort.shared.configure(config)
+
+        let auction = BannerAuctionBuilder(
+            slotId: "test_slot_id",
+            deviceType: "test_device_type"
+        ).build()
+
+        let vm = await TopsortBanner.ViewModel()
+        await vm.executeAuctions(auction: auction, topsort: mockTopsort, onError: nil, onNoWinners: nil)
+
+        XCTAssertEqual(mockTopsort.trackedRenders.count, 1)
+        XCTAssertEqual(mockTopsort.trackedRenders.first?.resolvedBidId, "bid-id")
+    }
+
     func testExecuteAuctionsCallsOnNoWinners() async throws {
         let auctionResult = AuctionResult(resultType: "result_type", winners: [], error: false)
         let auctionResponse = AuctionResponse(results: [auctionResult])
@@ -193,6 +218,7 @@ class TopsortBannerTests: XCTestCase {
             XCTAssertNil(vm.urlString, "No asset means no URL")
             XCTAssertNil(vm.resolvedBidId, "No asset means resolvedBidId stays nil")
         }
+        XCTAssertTrue(mockTopsort.trackedRenders.isEmpty, "No asset means nothing was shown, so no render should be tracked either")
     }
 
     func testViewModelEmptyResults() async throws {

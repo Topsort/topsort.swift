@@ -11,6 +11,20 @@ enum EventItem: Codable {
     case purchase(PurchaseEvent)
     case pageview(PageViewEvent)
     case render(RenderEvent)
+
+    var kind: EventItemKind {
+        switch self {
+        case .click: return .click
+        case .impression: return .impression
+        case .purchase: return .purchase
+        case .pageview: return .pageview
+        case .render: return .render
+        }
+    }
+}
+
+enum EventItemKind: Hashable {
+    case click, impression, purchase, pageview, render
 }
 
 extension [EventItem] {
@@ -74,6 +88,11 @@ let MAX_QUEUED_EVENTS = 5000
 /// Cap on a single POST body. Past this the request risks a 413, which is non-retriable and
 /// would discard the whole batch.
 let MAX_EVENTS_PER_BATCH = 500
+/// The API rejects a request whose renders/impressions/clicks/purchases/pageviews array
+/// exceeds this many items with a non-retriable 400 — discarding every event type bundled
+/// into that request, not just the type that went over. No single type may exceed it in one
+/// outgoing batch; events past the cap stay queued for the next one.
+let MAX_EVENTS_PER_TYPE_PER_BATCH = 50
 
 class EventManager {
     static let shared = EventManager()
@@ -247,8 +266,7 @@ class EventManager {
             }
         #endif
         while !eventQueue.isEmpty, inProgress.count < MAX_IN_PROGRESS {
-            let batch = Array(eventQueue.prefix(MAX_EVENTS_PER_BATCH))
-            eventQueue.removeFirst(batch.count)
+            let batch = nextBatch()
             guard let data = encode(batch) else {
                 continue
             }
@@ -261,6 +279,26 @@ class EventManager {
                 self.process_response(id: id, result: r)
             })
         }
+    }
+
+    /// Must be called on serialQueue. Takes events off the front of the queue up to
+    /// MAX_EVENTS_PER_BATCH total, capping each event type at MAX_EVENTS_PER_TYPE_PER_BATCH so
+    /// no array in the outgoing request exceeds the API's per-type limit; events past a type's
+    /// cap are left in the queue, in order, for the next batch.
+    private func nextBatch() -> [EventItem] {
+        var counts: [EventItemKind: Int] = [:]
+        var batch: [EventItem] = []
+        var remainder: [EventItem] = []
+        for item in eventQueue {
+            if batch.count < MAX_EVENTS_PER_BATCH, (counts[item.kind] ?? 0) < MAX_EVENTS_PER_TYPE_PER_BATCH {
+                counts[item.kind, default: 0] += 1
+                batch.append(item)
+            } else {
+                remainder.append(item)
+            }
+        }
+        eventQueue = remainder
+        return batch
     }
 
     /// An event that cannot be serialized (a non-finite `Double` in a purchase, say) can

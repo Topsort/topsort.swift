@@ -227,6 +227,9 @@ extension TopsortBanner {
             guard let asset = winner.asset?.first else { return }
             resolvedBidId = winner.resolvedBidId
             urlString = asset.url
+
+            let render = RenderEvent(resolvedBidId: winner.resolvedBidId, occurredAt: Date.now, opaqueUserId: topsort.opaqueUserId)
+            topsort.track(render: render)
         }
     }
 }
