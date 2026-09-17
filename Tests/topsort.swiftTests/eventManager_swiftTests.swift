@@ -236,10 +236,12 @@ class EventManagerTests: XCTestCase {
     }
 
     /// A backlog used to go out as one unbounded POST, which invites a 413 — non-retriable,
-    /// so the entire backlog would be discarded. It is now split into capped batches.
-    func testLargeQueueIsSentInBatchesCappedAtMaxEventsPerBatch() throws {
+    /// so the entire backlog would be discarded. It is now split into capped batches. A queue
+    /// of a single type is bound by MAX_EVENTS_PER_TYPE_PER_BATCH (the API's real per-type
+    /// limit, 50), not MAX_EVENTS_PER_BATCH (500), which no single-type backlog can ever reach.
+    func testLargeQueueIsSentInBatchesCappedAtMaxEventsPerTypePerBatch() throws {
         eventManager.flushAt = MAX_QUEUED_EVENTS + 10
-        let total = MAX_EVENTS_PER_BATCH * 2 + 200
+        let total = MAX_EVENTS_PER_TYPE_PER_BATCH * 2 + 20
         eventManager._eventQueue = (0 ..< total).map { i in
             .impression(Event(entity: Entity(type: .product, id: "p\(i)"), occurredAt: Date.now))
         }
@@ -256,13 +258,13 @@ class EventManagerTests: XCTestCase {
             let impressions = try XCTUnwrap(json["impressions"] as? [[String: Any]])
             sizes.append(impressions.count)
         }
-        XCTAssertEqual(sizes, [MAX_EVENTS_PER_BATCH, MAX_EVENTS_PER_BATCH, 200])
+        XCTAssertEqual(sizes, [MAX_EVENTS_PER_TYPE_PER_BATCH, MAX_EVENTS_PER_TYPE_PER_BATCH, 20])
     }
 
     /// The drain stops at the in-flight cap; what is left waits for the next flush.
     func testSendLoopStopsAtTheInFlightCap() {
         eventManager.flushAt = MAX_QUEUED_EVENTS + 10
-        let total = MAX_EVENTS_PER_BATCH * (MAX_IN_PROGRESS + 1)
+        let total = MAX_EVENTS_PER_TYPE_PER_BATCH * (MAX_IN_PROGRESS + 1)
         eventManager._eventQueue = (0 ..< total).map { i in
             .impression(Event(entity: Entity(type: .product, id: "p\(i)"), occurredAt: Date.now))
         }
@@ -270,7 +272,48 @@ class EventManagerTests: XCTestCase {
         eventManager.flushAndPersist()
 
         XCTAssertEqual(mockClient.postCallCount, MAX_IN_PROGRESS)
-        XCTAssertEqual(eventManager._eventQueue?.count, MAX_EVENTS_PER_BATCH, "the batch past the cap should stay queued")
+        XCTAssertEqual(eventManager._eventQueue?.count, MAX_EVENTS_PER_TYPE_PER_BATCH, "the batch past the cap should stay queued")
+    }
+
+    /// Regression test: renders above 50 in one request used to get the whole request rejected
+    /// with a non-retriable 400 (the API caps every event-type array at 50), silently dropping
+    /// every event type bundled into that request — not just the renders past the cap.
+    func test51RendersAreSplitAcrossTwoBatches() throws {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        eventManager._eventQueue = (0 ..< 51).map { i in
+            .render(RenderEvent(resolvedBidId: "bid-\(i)", occurredAt: Date.now))
+        }
+
+        eventManager.flushAndPersist()
+
+        XCTAssertEqual(mockClient.postCallCount, 2)
+        XCTAssertEqual(eventManager._eventQueue?.count, 0)
+        let sizes = try mockClient.allPostedData.map { data -> Int in
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            return try XCTUnwrap(json["renders"] as? [[String: Any]]).count
+        }
+        XCTAssertEqual(sizes, [MAX_EVENTS_PER_TYPE_PER_BATCH, 1])
+    }
+
+    /// The bug as originally filed: 60 renders queued alongside 10 clicks used to go out as one
+    /// request (well under MAX_EVENTS_PER_BATCH), rejecting the clicks too even though they were
+    /// never near their own limit. Each type must be capped independently.
+    func testMixedBatchCapsEachTypeIndependently() throws {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        let renders: [EventItem] = (0 ..< 60).map { .render(RenderEvent(resolvedBidId: "bid-\($0)", occurredAt: Date.now)) }
+        let clicks: [EventItem] = (0 ..< 10).map { .click(Event(entity: Entity(type: .product, id: "p\($0)"), occurredAt: Date.now)) }
+        eventManager._eventQueue = renders + clicks
+
+        eventManager.flushAndPersist()
+
+        XCTAssertEqual(mockClient.postCallCount, 2)
+        let first = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(mockClient.allPostedData.first)) as? [String: Any])
+        XCTAssertEqual((first["renders"] as? [[String: Any]])?.count, MAX_EVENTS_PER_TYPE_PER_BATCH)
+        XCTAssertEqual((first["clicks"] as? [[String: Any]])?.count, 10, "clicks under their own cap ride along in the first request")
+
+        let second = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(mockClient.allPostedData.last)) as? [String: Any])
+        XCTAssertEqual((second["renders"] as? [[String: Any]])?.count, 10)
+        XCTAssertNil(second["clicks"])
     }
 
     /// JSONEncoder refuses non-finite doubles. One such purchase must not take the rest of

@@ -10,6 +10,21 @@ enum EventItem: Codable {
     case impression(Event)
     case purchase(PurchaseEvent)
     case pageview(PageViewEvent)
+    case render(RenderEvent)
+
+    var kind: EventItemKind {
+        switch self {
+        case .click: return .click
+        case .impression: return .impression
+        case .purchase: return .purchase
+        case .pageview: return .pageview
+        case .render: return .render
+        }
+    }
+}
+
+enum EventItemKind: Hashable {
+    case click, impression, purchase, pageview, render
 }
 
 extension [EventItem] {
@@ -18,19 +33,22 @@ extension [EventItem] {
         var clicks: [Event] = []
         var purchases: [PurchaseEvent] = []
         var pageviews: [PageViewEvent] = []
+        var renders: [RenderEvent] = []
         for item in self {
             switch item {
             case let .impression(event): impressions.append(event)
             case let .click(event): clicks.append(event)
             case let .purchase(event): purchases.append(event)
             case let .pageview(event): pageviews.append(event)
+            case let .render(event): renders.append(event)
             }
         }
         return Events(
             impressions: impressions.isEmpty ? nil : impressions,
             clicks: clicks.isEmpty ? nil : clicks,
             purchases: purchases.isEmpty ? nil : purchases,
-            pageviews: pageviews.isEmpty ? nil : pageviews
+            pageviews: pageviews.isEmpty ? nil : pageviews,
+            renders: renders.isEmpty ? nil : renders
         )
     }
 }
@@ -49,6 +67,7 @@ struct PendingEvents: Codable {
         count += events.clicks?.count ?? 0
         count += events.purchases?.count ?? 0
         count += events.pageviews?.count ?? 0
+        count += events.renders?.count ?? 0
         return count
     }
 
@@ -69,6 +88,11 @@ let MAX_QUEUED_EVENTS = 5000
 /// Cap on a single POST body. Past this the request risks a 413, which is non-retriable and
 /// would discard the whole batch.
 let MAX_EVENTS_PER_BATCH = 500
+/// The API rejects a request whose renders/impressions/clicks/purchases/pageviews array
+/// exceeds this many items with a non-retriable 400 — discarding every event type bundled
+/// into that request, not just the type that went over. No single type may exceed it in one
+/// outgoing batch; events past the cap stay queued for the next one.
+let MAX_EVENTS_PER_TYPE_PER_BATCH = 50
 
 class EventManager {
     static let shared = EventManager()
@@ -242,8 +266,7 @@ class EventManager {
             }
         #endif
         while !eventQueue.isEmpty, inProgress.count < MAX_IN_PROGRESS {
-            let batch = Array(eventQueue.prefix(MAX_EVENTS_PER_BATCH))
-            eventQueue.removeFirst(batch.count)
+            let batch = nextBatch()
             guard let data = encode(batch) else {
                 continue
             }
@@ -256,6 +279,26 @@ class EventManager {
                 self.process_response(id: id, result: r)
             })
         }
+    }
+
+    /// Must be called on serialQueue. Takes events off the front of the queue up to
+    /// MAX_EVENTS_PER_BATCH total, capping each event type at MAX_EVENTS_PER_TYPE_PER_BATCH so
+    /// no array in the outgoing request exceeds the API's per-type limit; events past a type's
+    /// cap are left in the queue, in order, for the next batch.
+    private func nextBatch() -> [EventItem] {
+        var counts: [EventItemKind: Int] = [:]
+        var batch: [EventItem] = []
+        var remainder: [EventItem] = []
+        for item in eventQueue {
+            if batch.count < MAX_EVENTS_PER_BATCH, (counts[item.kind] ?? 0) < MAX_EVENTS_PER_TYPE_PER_BATCH {
+                counts[item.kind, default: 0] += 1
+                batch.append(item)
+            } else {
+                remainder.append(item)
+            }
+        }
+        eventQueue = remainder
+        return batch
     }
 
     /// An event that cannot be serialized (a non-finite `Double` in a purchase, say) can

@@ -10,7 +10,7 @@
 Swift SDK for [Topsort](https://www.topsort.com) retail media: auctions, event tracking, and banner ads.
 
 **Two libraries, zero external dependencies:**
-- **`Topsort`** — Core SDK for running auctions and tracking events (impressions, clicks, purchases)
+- **`Topsort`** — Core SDK for running auctions and tracking events (renders, impressions, clicks, purchases)
 - **`TopsortBanners`** — Drop-in SwiftUI banner component with built-in auction, rendering, and tracking
 
 ## Installation
@@ -103,7 +103,16 @@ See all auction models in [`Auctions.swift`](Sources/Topsort/Models/Auctions.swi
 
 ### 3. Track Events
 
-Track impressions, clicks, purchases, and page views. Events are batched automatically and flushed every 30 seconds or when the batch reaches 30 events; see [How Events Are Delivered](#how-events-are-delivered).
+Track renders, impressions, clicks, purchases, and page views. Events are batched automatically and flushed every 30 seconds or when the batch reaches 30 events; see [How Events Are Delivered](#how-events-are-delivered).
+
+#### Renders
+
+```swift
+let render = RenderEvent(resolvedBidId: winner.resolvedBidId, occurredAt: Date.now)
+Topsort.shared.track(render: render)
+```
+
+A render records that a sponsored ad was inserted into the page, separately from the impression that records it becoming visible. Renders are sponsored-only, so `resolvedBidId` is required (there is no `entity` initializer). Report it once per `resolvedBidId`, as soon as the ad is placed in the DOM/view hierarchy — before the impression, which fires when it is actually seen.
 
 #### Impressions & Clicks
 
@@ -194,9 +203,10 @@ try await client.send(clicks: [Event(resolvedBidId: winner.resolvedBidId, occurr
 Topsort (core)              TopsortBanners (UI)
 ├── Topsort.shared          └── TopsortBanner (SwiftUI View)
 │   ├── configure()             ├── Runs auction
-│   ├── track(impression:)      ├── Loads & renders image
-│   ├── track(click:)           ├── Tracks impression on image load
-│   ├── track(purchase:)        └── Tracks click on tap
+│   ├── track(render:)          ├── Loads & renders image
+│   ├── track(impression:)      ├── Tracks impression on image load
+│   ├── track(click:)           └── Tracks click on tap
+│   ├── track(purchase:)
 │   ├── track(pageview:)
 │   ├── flush()
 │   └── executeAuctions()
@@ -270,6 +280,7 @@ final class StubTopsort: TopsortProtocol {
     func track(click event: Event) { tracked.append(event) }
     func track(purchase _: PurchaseEvent) {}
     func track(pageview _: PageViewEvent) {}
+    func track(render _: RenderEvent) {}
     func flush() {}
     func executeAuctions(auctions _: [Auction]) async throws(AuctionError) -> AuctionResponse { response }
 }
@@ -279,7 +290,7 @@ let banner = TopsortBanner(bannerAuctionBuilder: builder, topsort: StubTopsort(r
 
 ## Privacy Manifest
 
-The `Topsort` library ships a `PrivacyInfo.xcprivacy` resource declaring what it sends to Topsort: a user identifier (`opaqueUserId`, a random UUID the SDK generates unless you call `set(opaqueUserId:)`), purchase history (`track(purchase:)`), product interaction (impressions, clicks, page views), and search history (`searchQuery` on auctions and placements). All four are declared as linked to the user, not used for tracking, with purposes *Analytics*, *Developer's Advertising or Marketing* and *Third-Party Advertising* — the ads are the marketplace's vendors', served by Topsort. It accesses no required-reason APIs and lists no tracking domains.
+The `Topsort` library ships a `PrivacyInfo.xcprivacy` resource declaring what it sends to Topsort: a user identifier (`opaqueUserId`, a random UUID the SDK generates unless you call `set(opaqueUserId:)`), purchase history (`track(purchase:)`), product interaction (renders, impressions, clicks, page views), and search history (`searchQuery` on auctions and placements). All four are declared as linked to the user, not used for tracking, with purposes *Analytics*, *Developer's Advertising or Marketing* and *Third-Party Advertising* — the ads are the marketplace's vendors', served by Topsort. It accesses no required-reason APIs and lists no tracking domains.
 
 Xcode merges this into your app's privacy report, but App Store Connect's questionnaire is answered from your own manifest: declare the same data types there, and only mark them as tracking if you pass an identifier that is used across apps or sites. Purchase history does not apply if you never call `track(purchase:)`, nor search history if you never pass `searchQuery`. `AuctionGeoTargeting.location` is a free-form string the SDK does not classify: if you derive it from the user's location, declare *Coarse Location* yourself.
 
