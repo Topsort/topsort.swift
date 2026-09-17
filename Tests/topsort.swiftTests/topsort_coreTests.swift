@@ -26,6 +26,13 @@ class TopsortCoreTests: XCTestCase {
         XCTAssertNotNil(EventManager.shared.onEventsDiscarded)
     }
 
+    func testConfigurationPassesDeliveryCallbackThrough() {
+        var config = Configuration(apiKey: "test-key")
+        config.onEventsDelivered = { _ in }
+        XCTAssertNoThrow(try Topsort.shared.configure(config))
+        XCTAssertNotNil(EventManager.shared.onEventsDelivered)
+    }
+
     override func tearDown() {
         Topsort.shared.isConfigured = true
         AuctionManager.shared.timeoutInterval = 60

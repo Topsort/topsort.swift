@@ -502,6 +502,84 @@ class EventManagerTests: XCTestCase {
         waitForDiscard(discards, .retriesExhausted, 2)
     }
 
+    // MARK: - onEventsDelivered
+
+    private final class Deliveries: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _all: [Int] = []
+        var all: [Int] {
+            lock.withLock { _all }
+        }
+
+        func record(_ count: Int) {
+            lock.withLock { _all.append(count) }
+        }
+    }
+
+    private func recordDeliveries() -> Deliveries {
+        let deliveries = Deliveries()
+        XCTAssertNoThrow(try eventManager.configure(apiKey: "test-key", url: nil, onEventsDelivered: { deliveries.record($0) }))
+        return deliveries
+    }
+
+    private func waitForDelivery(_ deliveries: Deliveries, _ count: Int) {
+        let seen = NSPredicate { _, _ in deliveries.all.contains(count) }
+        wait(for: [expectation(for: seen, evaluatedWith: nil)], timeout: 3)
+        XCTAssertEqual(deliveries.all.count, 1, "unexpected extra deliveries: \(deliveries.all)")
+    }
+
+    func testDeliveryCallbackCountsTheAcknowledgedBatch() {
+        let deliveries = recordDeliveries()
+        eventManager.flushAt = 2
+        eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)))
+        eventManager.push(event: .purchase(PurchaseEvent(items: [PurchaseItem(productId: "p2", unitPrice: 9.99)], occurredAt: Date.now)))
+        waitForDelivery(deliveries, 2)
+    }
+
+    /// The point of the callback: the ledger is empty by the time the host is told, so a host
+    /// watching for delivery is never told about a batch that is still on disk.
+    func testDeliveryCallbackFiresAfterTheLedgerIsCleared() {
+        let deliveries = recordDeliveries()
+        eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)))
+        waitForDelivery(deliveries, 1)
+        let drained = NSPredicate { _, _ in self.eventManager._pendingEvents?.isEmpty == true }
+        wait(for: [expectation(for: drained, evaluatedWith: nil)], timeout: 3)
+    }
+
+    func testDeliveryCallbackIsSilentOnFailure() {
+        let deliveries = recordDeliveries()
+        mockClient.postResult = .failure(.statusCode(code: 500, data: nil))
+        eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)))
+
+        let attempted = NSPredicate { _, _ in self.mockClient.postCallCount == 1 }
+        wait(for: [expectation(for: attempted, evaluatedWith: nil)], timeout: 3)
+        XCTAssertEqual(deliveries.all, [], "a retriable failure is not a delivery")
+    }
+
+    func testDeliveryCallbackIsSilentOnPermanentRejection() {
+        let deliveries = recordDeliveries()
+        mockClient.postResult = .failure(.statusCode(code: 401, data: nil))
+        eventManager.push(event: .impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)))
+
+        let attempted = NSPredicate { _, _ in self.mockClient.postCallCount == 1 }
+        wait(for: [expectation(for: attempted, evaluatedWith: nil)], timeout: 3)
+        XCTAssertEqual(deliveries.all, [], "a discarded batch is not a delivery")
+    }
+
+    /// A batch that only lands on a retry is still a delivery, reported once.
+    func testDeliveryCallbackReportsABatchDeliveredOnRetry() throws {
+        let deliveries = recordDeliveries()
+        let two = Events(impressions: [
+            Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now),
+            Event(entity: Entity(type: .product, id: "p2"), occurredAt: Date.now),
+        ])
+        let id = UUID()
+        let stale = Date(timeIntervalSinceNow: -100_000)
+        eventManager._pendingEvents = try [id: PendingEvents(id: id, data: JSONEncoder().encode(two), createdAt: stale, retries: 3, lastRetry: stale)]
+        eventManager.flush()
+        waitForDelivery(deliveries, 2)
+    }
+
     #if canImport(UIKit) && !os(watchOS)
         /// Records begin/end; a test bundle has no UIApplication, so the real provider cannot be
         /// observed here.
