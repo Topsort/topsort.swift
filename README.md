@@ -232,11 +232,27 @@ Topsort (core)              TopsortBanners (UI)
 | `flushInterval` | `TimeInterval` | `30` | Seconds between automatic flushes (greater than 0) |
 | `logLevel` | `LogLevel` | `.warning` | Log verbosity: `.none`, `.error`, `.warning`, `.debug` |
 | `onEventsDiscarded` | `(@Sendable (DiscardReason, Int) -> Void)?` | `nil` | Called on the SDK's serial queue each time it gives up on events, with the reason and how many; see [Error Handling](#error-handling) |
+| `onEventsDelivered` | `(@Sendable (Int) -> Void)?` | `nil` | Called on the SDK's serial queue each time the API acknowledges a batch, with how many events it carried; see [Confirming Delivery](#confirming-delivery) |
 | `identity` | `Identity` | `.persisted` | What happens to a minted user id: `.persisted` (written to disk, reused across launches) or `.ephemeral` (this process only; the stored id is removed) |
 
 ## How Events Are Delivered
 
 A `track` call appends the event to an in-memory queue and returns; nothing happens on the caller's thread. The queue is sent when it reaches `flushAt`, every `flushInterval`, on `flush()`, when the app goes to the background or terminates, and when connectivity returns. Sends are retried with exponential backoff, across being offline and across launches: both are written atomically to `Application Support` — the queue debounced 5 s (and synchronously on background/terminate), the set of unacknowledged batches on every change, because that set is what decides whether a batch is re-sent after a crash. Events are never dropped for being old; the only drops are the ones [Error Handling](#error-handling) describes.
+
+## Confirming Delivery
+
+A batch stays in the unacknowledged set until the API answers, and nothing else in the SDK reports that it landed. An in-app network inspector may not show the response for the session events are sent on, in which case a request that was accepted looks indistinguishable from one still in flight. An HTTP proxy, which sits below `URLSession`, does show it.
+
+To confirm delivery from inside the app, set `onEventsDelivered`:
+
+```swift
+config.logLevel = .debug              // logs each acknowledgement and what is left unacknowledged
+config.onEventsDelivered = { count in
+    print("Topsort acknowledged \(count) event(s)")
+}
+```
+
+An acknowledgement that never arrives — the app was suspended mid-request, the connection dropped after the API accepted the batch — leaves the batch on disk to be re-sent on the next flush or the next launch. That redelivery is harmless as long as each event carries a stable `id`: the API dedups on it. Pass your own order number as `PurchaseEvent.id` rather than letting it default to a fresh `UUID()`, or a purchase reported twice will be counted twice.
 
 ## Error Handling
 

@@ -54,6 +54,21 @@ public struct Configuration {
     /// work it was doing: keep it quick, capture nothing that must not outlive the process, and
     /// do not call `configure` from it (`track` and `flush` are fine).
     public var onEventsDiscarded: (@Sendable (DiscardReason, Int) -> Void)?
+    /// Called when the API acknowledges a batch, with how many events it carried.
+    ///
+    /// Delivery is otherwise unreported: nothing else in the SDK marks a batch as landed, and an
+    /// in-app network inspector may not show the response for the session events are sent on, in
+    /// which case a request that was accepted looks indistinguishable from one still in flight.
+    /// Set this to confirm delivery — a QA check, a counter to reconcile against the dashboard.
+    ///
+    /// Runs on the SDK's serial queue, ahead of the work it was doing, under the same rules as
+    /// `onEventsDiscarded`: keep it quick, capture nothing that must not outlive the process,
+    /// and do not call `configure` from it (`track` and `flush` are fine).
+    ///
+    /// Acknowledged means the API accepted the batch, not that every event in it was valid, and
+    /// the count is of events sent rather than events newly recorded — a redelivery after a lost
+    /// acknowledgement is counted again, though the API dedups it on each event's `id`.
+    public var onEventsDelivered: (@Sendable (Int) -> Void)?
 
     public init(apiKey: String) {
         self.apiKey = apiKey

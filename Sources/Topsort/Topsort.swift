@@ -68,7 +68,8 @@ public class Topsort: TopsortProtocol {
             url: configuration.url,
             flushAt: configuration.flushAt,
             flushInterval: configuration.flushInterval,
-            onEventsDiscarded: configuration.onEventsDiscarded
+            onEventsDiscarded: configuration.onEventsDiscarded,
+            onEventsDelivered: configuration.onEventsDelivered
         )
         Logger.logLevel = configuration.logLevel
         identityLock.withLock {
