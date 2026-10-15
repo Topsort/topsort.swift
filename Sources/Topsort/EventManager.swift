@@ -327,17 +327,28 @@ class EventManager {
         return batch
     }
 
+    /// An event that breaks a spec rule would get its whole batch rejected with a 400. `push`
+    /// refuses them, but the queue restored from disk can hold events an earlier SDK version
+    /// accepted, so the check runs again here, before anything reaches the wire.
     /// An event that cannot be serialized (a non-finite `Double` in a purchase, say) can
     /// never be sent; keeping it would stall every later batch behind it. Only the offending
     /// events are dropped, not the batch they happened to share.
     private func encode(_ batch: [EventItem]) -> Data? {
+        let valid = batch.filter { $0.specViolation == nil }
+        if valid.count < batch.count {
+            Logger.warning("Dropping \(batch.count - valid.count) queued events the API would reject")
+            discarded(batch.count - valid.count, reason: .invalid)
+        }
+        guard !valid.isEmpty else {
+            return nil
+        }
         let encoder = JSONEncoder()
-        if let data = try? encoder.encode(batch.toEvents()) {
+        if let data = try? encoder.encode(valid.toEvents()) {
             return data
         }
-        let encodable = batch.filter { (try? encoder.encode($0)) != nil }
-        Logger.error("Dropping \(batch.count - encodable.count) events that cannot be serialized")
-        discarded(batch.count - encodable.count, reason: .unserializable)
+        let encodable = valid.filter { (try? encoder.encode($0)) != nil }
+        Logger.error("Dropping \(valid.count - encodable.count) events that cannot be serialized")
+        discarded(valid.count - encodable.count, reason: .unserializable)
         guard !encodable.isEmpty else {
             return nil
         }
