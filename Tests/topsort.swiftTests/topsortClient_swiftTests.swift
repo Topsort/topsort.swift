@@ -82,6 +82,28 @@ class TopsortClientTests: XCTestCase {
         XCTAssertEqual(sizes, [50, 1])
     }
 
+    /// videoEvents share the API's per-type limit of 50, so a 51-event call is two requests.
+    func testSendSplits51VideoEventsAcrossTwoRequests() async throws {
+        var bodies: [Data] = []
+        MockURLProtocol.requestHandler = { request in
+            let stream = request.httpBodyStream!
+            stream.open()
+            var buffer = [UInt8](repeating: 0, count: 32768)
+            let read = stream.read(&buffer, maxLength: buffer.count)
+            bodies.append(Data(buffer[0 ..< max(read, 0)]))
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
+        }
+        let videoEvents = (0 ..< 51).map { VideoEvent(resolvedBidId: "bid-\($0)", checkpoint: .start, occurredAt: Date.now, opaqueUserId: "u1") }
+        try await client.send(videoEvents: videoEvents)
+
+        XCTAssertEqual(bodies.count, 2)
+        let sizes = try bodies.map { body -> Int in
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            return try XCTUnwrap(json["videoEvents"] as? [[String: Any]]).count
+        }
+        XCTAssertEqual(sizes, [50, 1])
+    }
+
     func testSendWithNothingToSendDoesNotPost() async throws {
         MockURLProtocol.requestHandler = { _ in XCTFail("must not send"); throw URLError(.badURL) }
         try await client.send()

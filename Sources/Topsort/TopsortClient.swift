@@ -33,7 +33,7 @@ public struct TopsortClient {
     }
 
     /// Reports events, splitting into as many sequential requests as needed to keep each
-    /// renders/impressions/clicks/purchases/pageviews array at or under the API's per-type
+    /// renders/impressions/clicks/purchases/pageviews/videoEvents array at or under the API's per-type
     /// limit (`MAX_EVENTS_PER_TYPE_PER_BATCH`) — past it the API rejects the whole request with
     /// a 400. Nothing is retried: a thrown error means the caller still owns every event from
     /// that request onward. Retrying is only safe if the caller resends the exact same event
@@ -43,15 +43,16 @@ public struct TopsortClient {
     /// double-billed or double-attributed events for whatever chunk actually made it through.
     /// Pass `opaqueUserId` to every event — the initializers' default reaches for
     /// `Topsort.shared`, which mints and persists a device id, so omitting it is not stateless.
-    public func send(impressions: [Event] = [], clicks: [Event] = [], purchases: [PurchaseEvent] = [], pageviews: [PageViewEvent] = [], renders: [RenderEvent] = []) async throws(HTTPClientError) {
-        guard !(impressions.isEmpty && clicks.isEmpty && purchases.isEmpty && pageviews.isEmpty && renders.isEmpty) else { return }
+    public func send(impressions: [Event] = [], clicks: [Event] = [], purchases: [PurchaseEvent] = [], pageviews: [PageViewEvent] = [], renders: [RenderEvent] = [], videoEvents: [VideoEvent] = []) async throws(HTTPClientError) {
+        guard !(impressions.isEmpty && clicks.isEmpty && purchases.isEmpty && pageviews.isEmpty && renders.isEmpty && videoEvents.isEmpty) else { return }
 
         let impressionChunks = impressions.chunked(into: MAX_EVENTS_PER_TYPE_PER_BATCH)
         let clickChunks = clicks.chunked(into: MAX_EVENTS_PER_TYPE_PER_BATCH)
         let purchaseChunks = purchases.chunked(into: MAX_EVENTS_PER_TYPE_PER_BATCH)
         let pageviewChunks = pageviews.chunked(into: MAX_EVENTS_PER_TYPE_PER_BATCH)
         let renderChunks = renders.chunked(into: MAX_EVENTS_PER_TYPE_PER_BATCH)
-        let requestCount = [impressionChunks.count, clickChunks.count, purchaseChunks.count, pageviewChunks.count, renderChunks.count].max() ?? 0
+        let videoChunks = videoEvents.chunked(into: MAX_EVENTS_PER_TYPE_PER_BATCH)
+        let requestCount = [impressionChunks.count, clickChunks.count, purchaseChunks.count, pageviewChunks.count, renderChunks.count, videoChunks.count].max() ?? 0
 
         for index in 0 ..< requestCount {
             let events = Events(
@@ -59,7 +60,8 @@ public struct TopsortClient {
                 clicks: index < clickChunks.count ? clickChunks[index] : nil,
                 purchases: index < purchaseChunks.count ? purchaseChunks[index] : nil,
                 pageviews: index < pageviewChunks.count ? pageviewChunks[index] : nil,
-                renders: index < renderChunks.count ? renderChunks[index] : nil
+                renders: index < renderChunks.count ? renderChunks[index] : nil,
+                videoEvents: index < videoChunks.count ? videoChunks[index] : nil
             )
             let body: Data
             do {

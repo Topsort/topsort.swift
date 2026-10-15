@@ -11,6 +11,7 @@ enum EventItem: Codable {
     case purchase(PurchaseEvent)
     case pageview(PageViewEvent)
     case render(RenderEvent)
+    case video(VideoEvent)
 
     var kind: EventItemKind {
         switch self {
@@ -19,12 +20,13 @@ enum EventItem: Codable {
         case .purchase: return .purchase
         case .pageview: return .pageview
         case .render: return .render
+        case .video: return .video
         }
     }
 }
 
 enum EventItemKind: Hashable {
-    case click, impression, purchase, pageview, render
+    case click, impression, purchase, pageview, render, video
 }
 
 extension [EventItem] {
@@ -34,6 +36,7 @@ extension [EventItem] {
         var purchases: [PurchaseEvent] = []
         var pageviews: [PageViewEvent] = []
         var renders: [RenderEvent] = []
+        var videoEvents: [VideoEvent] = []
         for item in self {
             switch item {
             case let .impression(event): impressions.append(event)
@@ -41,6 +44,7 @@ extension [EventItem] {
             case let .purchase(event): purchases.append(event)
             case let .pageview(event): pageviews.append(event)
             case let .render(event): renders.append(event)
+            case let .video(event): videoEvents.append(event)
             }
         }
         return Events(
@@ -48,7 +52,8 @@ extension [EventItem] {
             clicks: clicks.isEmpty ? nil : clicks,
             purchases: purchases.isEmpty ? nil : purchases,
             pageviews: pageviews.isEmpty ? nil : pageviews,
-            renders: renders.isEmpty ? nil : renders
+            renders: renders.isEmpty ? nil : renders,
+            videoEvents: videoEvents.isEmpty ? nil : videoEvents
         )
     }
 }
@@ -68,6 +73,7 @@ struct PendingEvents: Codable {
         count += events.purchases?.count ?? 0
         count += events.pageviews?.count ?? 0
         count += events.renders?.count ?? 0
+        count += events.videoEvents?.count ?? 0
         return count
     }
 
@@ -88,7 +94,7 @@ let MAX_QUEUED_EVENTS = 5000
 /// Cap on a single POST body. Past this the request risks a 413, which is non-retriable and
 /// would discard the whole batch.
 let MAX_EVENTS_PER_BATCH = 500
-/// The API rejects a request whose renders/impressions/clicks/purchases/pageviews array
+/// The API rejects a request whose renders/impressions/clicks/purchases/pageviews/videoEvents array
 /// exceeds this many items with a non-retriable 400 — discarding every event type bundled
 /// into that request, not just the type that went over. No single type may exceed it in one
 /// outgoing batch; events past the cap stay queued for the next one.
