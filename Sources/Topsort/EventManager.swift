@@ -23,6 +23,16 @@ enum EventItem: Codable {
         case .video: return .video
         }
     }
+
+    var specViolation: String? {
+        switch self {
+        case let .click(event), let .impression(event): return event.specViolation
+        case let .purchase(event): return event.specViolation
+        case let .pageview(event): return event.specViolation
+        case let .render(event): return event.specViolation
+        case let .video(event): return event.specViolation
+        }
+    }
 }
 
 enum EventItemKind: Hashable {
@@ -105,7 +115,12 @@ class EventManager {
     private let serialQueue = DispatchQueue(label: "com.topsort.analytics.EventManager")
     private var periodicEvent: PeriodicEvent
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.event-queue.plist"))
-    var _eventQueue: [EventItem]?
+    var _persistedQueue: LossyArray<EventItem>?
+    var _eventQueue: [EventItem]? {
+        get { _persistedQueue?.elements }
+        set { _persistedQueue = newValue.map(LossyArray.init) }
+    }
+
     private var eventQueue: [EventItem] {
         get {
             if let eq = _eventQueue {
@@ -163,7 +178,7 @@ class EventManager {
         // The queue can afford the 5 s debounce: a lost write costs at most a few events. The
         // pending set is the at-least-once ledger — a batch acknowledged in memory but still on
         // disk is re-sent after a crash and billed twice — so every change is written right away.
-        __eventQueue.deferPersistence = true
+        __persistedQueue.deferPersistence = true
         periodicEvent = PeriodicEvent(interval: 30, action: { EventManager.shared.handlePeriodicEvent() })
         periodicEvent.start()
         lifecycleObserver = LifecycleObserver(
@@ -219,6 +234,11 @@ class EventManager {
 
     func push(event: EventItem) {
         serialQueue.async {
+            if let violation = event.specViolation {
+                Logger.warning("Dropping a \(event.kind) event the API would reject: \(violation)")
+                self.discarded(1, reason: .invalid)
+                return
+            }
             self.eventQueue.append(event)
             if self.eventQueue.count > MAX_QUEUED_EVENTS {
                 let dropped = self.eventQueue.count - MAX_QUEUED_EVENTS
@@ -253,7 +273,7 @@ class EventManager {
         serialQueue.sync {
             self.performSend()
             self.performRetry()
-            self.__eventQueue.persistIfDirty()
+            self.__persistedQueue.persistIfDirty()
             // Never dirty (it persists on every change); the call still drains its queued writes.
             self.__pendingEvents.persistIfDirty()
         }

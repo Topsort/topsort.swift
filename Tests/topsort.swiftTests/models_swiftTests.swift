@@ -113,7 +113,7 @@ class EventModelTests: XCTestCase {
         let products = try AuctionProducts(ids: ["p1", "p2"])
         let category = AuctionCategory(id: "c1")
         let geo = AuctionGeoTargeting(location: "US")
-        let auction = Auction(type: "banners", slots: 1, slotId: "home", device: "mobile", products: products, category: category, searchQuery: "test", geoTargeting: geo)
+        let auction = Auction(type: "banners", slots: 1, slotId: "home", device: .mobile, products: products, category: category, searchQuery: "test", geoTargeting: geo)
 
         let data = try JSONEncoder().encode(auction)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -280,5 +280,68 @@ class EventModelTests: XCTestCase {
         XCTAssertEqual(json["path"] as? String, "/home")
         XCTAssertNil(json["position"])
         XCTAssertNil(json["page"])
+    }
+
+    // MARK: - Spec enums
+
+    /// The raw values are what goes on the wire; they must be the API's enum values exactly.
+    func testSpecEnumRawValuesMatchTheAPI() {
+        XCTAssertEqual([DeviceType.desktop, .mobile].map(\.rawValue), ["desktop", "mobile"])
+        XCTAssertEqual([Channel.onsite, .offsite, .instore].map(\.rawValue), ["onsite", "offsite", "instore"])
+        XCTAssertEqual([ClickType.product, .like, .addToCart].map(\.rawValue), ["product", "like", "add-to-cart"])
+        XCTAssertEqual(
+            [PageType.home, .category, .pdp, .search, .cart, .other].map(\.rawValue),
+            ["home", "category", "PDP", "search", "cart", "other"]
+        )
+    }
+
+    // MARK: - Spec rules the types cannot express
+
+    func testPlacementSpecViolations() {
+        XCTAssertNil(Placement(path: "/home", position: 1, page: 1, pageSize: 1, productId: "p", categoryIds: ["c"], searchQuery: "q").specViolation)
+        XCTAssertNotNil(Placement(path: "").specViolation)
+        XCTAssertNotNil(Placement(path: "/home", position: 0).specViolation)
+        XCTAssertNotNil(Placement(path: "/home", page: 0).specViolation)
+        XCTAssertNotNil(Placement(path: "/home", pageSize: 0).specViolation)
+        XCTAssertNotNil(Placement(path: "/home", productId: "").specViolation)
+        XCTAssertNotNil(Placement(path: "/home", categoryIds: []).specViolation)
+        XCTAssertNotNil(Placement(path: "/home", searchQuery: "").specViolation)
+    }
+
+    func testEventSpecViolations() {
+        XCTAssertNil(Event(resolvedBidId: "bid", occurredAt: Date.now, opaqueUserId: "u").specViolation)
+        XCTAssertNotNil(Event(resolvedBidId: "bid", occurredAt: Date.now, opaqueUserId: "u", id: "").specViolation)
+        XCTAssertNotNil(RenderEvent(resolvedBidId: "bid", occurredAt: Date.now, opaqueUserId: "u", placement: Placement(path: "")).specViolation)
+        XCTAssertNotNil(VideoEvent(resolvedBidId: "bid", checkpoint: .start, occurredAt: Date.now, opaqueUserId: "u", id: "").specViolation)
+        XCTAssertNotNil(PurchaseEvent(items: [PurchaseItem(productId: "p", unitPrice: 1)], occurredAt: Date.now, opaqueUserId: "u", id: "").specViolation)
+        XCTAssertNotNil(PageViewEvent(page: Page(type: .cart, pageId: "cart", values: []), occurredAt: Date.now, opaqueUserId: "u").specViolation)
+    }
+
+    // MARK: - Persisted queue
+
+    /// A queue saved by an earlier version can hold a value the current models reject (a free-form
+    /// deviceType, say). That event is skipped; the rest of the file must still load.
+    func testPersistedQueueSkipsEventsThatNoLongerDecode() throws {
+        let items: [EventItem] = (0 ..< 3).map { .click(Event(resolvedBidId: "bid-\($0)", occurredAt: Date.now, opaqueUserId: "u")) }
+        let plist = try PropertyListEncoder().encode(PersistedValueWrapper(value: items))
+        var root = try XCTUnwrap(PropertyListSerialization.propertyList(from: plist, format: nil) as? [String: Any])
+        var stored = try XCTUnwrap(root["value"] as? [[String: Any]])
+        var click = try XCTUnwrap(stored[1]["click"] as? [String: Any])
+        var event = try XCTUnwrap(click["_0"] as? [String: Any])
+        event["deviceType"] = "tablet"
+        click["_0"] = event
+        stored[1]["click"] = click
+        root["value"] = stored
+        let legacy = try PropertyListSerialization.data(fromPropertyList: root, format: .binary, options: 0)
+
+        XCTAssertThrowsError(try PropertyListDecoder().decode(PersistedValueWrapper<[EventItem]>.self, from: legacy), "a plain array loses the whole file")
+        let queue = try PropertyListDecoder().decode(PersistedValueWrapper<LossyArray<EventItem>>.self, from: legacy).value.elements
+        XCTAssertEqual(queue.count, 2)
+    }
+
+    /// LossyArray must write the same shape as a plain array, so files stay readable both ways.
+    func testLossyArrayEncodesLikeAPlainArray() throws {
+        let items: [EventItem] = [.click(Event(resolvedBidId: "bid", occurredAt: Date(timeIntervalSince1970: 0), opaqueUserId: "u", id: "e1"))]
+        XCTAssertEqual(try JSONEncoder().encode(LossyArray(items)), try JSONEncoder().encode(items))
     }
 }

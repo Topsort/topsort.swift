@@ -72,13 +72,13 @@ public enum BannerError: Error {
 
 public struct BannerAuctionBuilder {
     let slotId: String
-    let deviceType: String
+    let deviceType: DeviceType
     var products: AuctionProducts?
     var category: AuctionCategory?
     var searchQuery: String?
     var geoTargeting: AuctionGeoTargeting?
     public init(slotId: String,
-                deviceType: String)
+                deviceType: DeviceType)
     {
         self.slotId = slotId
         self.deviceType = deviceType
