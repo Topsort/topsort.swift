@@ -342,6 +342,9 @@ class EventModelTests: XCTestCase {
     /// LossyArray must write the same shape as a plain array, so files stay readable both ways.
     func testLossyArrayEncodesLikeAPlainArray() throws {
         let items: [EventItem] = [.click(Event(resolvedBidId: "bid", occurredAt: Date(timeIntervalSince1970: 0), opaqueUserId: "u", id: "e1"))]
-        XCTAssertEqual(try JSONEncoder().encode(LossyArray(items)), try JSONEncoder().encode(items))
+        // Key order is unspecified without .sortedKeys, so two encodings of one value can differ.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        XCTAssertEqual(try encoder.encode(LossyArray(items)), try encoder.encode(items))
     }
 }
