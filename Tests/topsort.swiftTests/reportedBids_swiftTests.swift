@@ -9,6 +9,26 @@ class ReportedBidsTests: XCTestCase {
         XCTAssertTrue(bids.markReported("bid-2", for: "user-1"), "other bids are unaffected")
     }
 
+    func testOnlyTheFirstRepeatIsReportedAsFirst() {
+        let bids = ReportedBids()
+        XCTAssertTrue(bids.isFirstRepeat())
+        XCTAssertFalse(bids.isFirstRepeat())
+        bids.clear()
+        XCTAssertTrue(bids.isFirstRepeat(), "clear starts over")
+    }
+
+    func testConcurrentRepeatsSeeExactlyOneFirst() {
+        let bids = ReportedBids()
+        let lock = NSLock()
+        var firsts = 0
+        DispatchQueue.concurrentPerform(iterations: 1000) { _ in
+            if bids.isFirstRepeat() {
+                lock.withLock { firsts += 1 }
+            }
+        }
+        XCTAssertEqual(firsts, 1)
+    }
+
     func testTheSameBidForAnotherUserIsNotARepeat() {
         let bids = ReportedBids()
         XCTAssertTrue(bids.markReported("bid-1", for: "user-1"))

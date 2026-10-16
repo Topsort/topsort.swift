@@ -30,6 +30,7 @@ final class ReportedBids {
     private let lock = NSLock()
     /// Least recently reported first. A linear scan is cheap at this size.
     private var reported: [Key] = []
+    private var repeatDropped = false
 
     init(capacity: Int = ReportedBids.defaultCapacity) {
         self.capacity = capacity
@@ -54,8 +55,21 @@ final class ReportedBids {
         }
     }
 
+    /// Whether this is the first repeat dropped in this process. The caller warns once and logs
+    /// the rest at debug: a lazy list reporting from `onAppear` repeats on every scroll, and a
+    /// warning each time would bury every other warning.
+    func isFirstRepeat() -> Bool {
+        lock.withLock {
+            defer { repeatDropped = true }
+            return !repeatDropped
+        }
+    }
+
     /// Only tests call this, to start each one without the bids earlier tests reported.
     func clear() {
-        lock.withLock { reported.removeAll() }
+        lock.withLock {
+            reported.removeAll()
+            repeatDropped = false
+        }
     }
 }

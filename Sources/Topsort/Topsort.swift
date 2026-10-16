@@ -107,7 +107,7 @@ public class Topsort: TopsortProtocol {
         }
         // Organic impressions carry no bid and legitimately repeat as a product reappears.
         if let bidId = event.resolvedBidId, !reportedImpressionBids.markReported(bidId, for: event.opaqueUserId) {
-            Logger.warning("Dropping a repeat impression for resolvedBidId \(bidId). A resolved bid earns one impression; report it once, when the ad is shown, not every time its view appears.")
+            logRepeat("Dropping a repeat impression for resolvedBidId \(bidId). A resolved bid earns one impression; report it once, when the ad is shown, not every time its view appears.", in: reportedImpressionBids)
             return
         }
         EventManager.shared.push(event: .impression(event))
@@ -143,10 +143,18 @@ public class Topsort: TopsortProtocol {
             return
         }
         if !reportedRenderBids.markReported(event.resolvedBidId, for: event.opaqueUserId) {
-            Logger.warning("Dropping a repeat render for resolvedBidId \(event.resolvedBidId). A resolved bid earns one render; report it once, when the ad enters the view, not every time its view appears.")
+            logRepeat("Dropping a repeat render for resolvedBidId \(event.resolvedBidId). A resolved bid earns one render; report it once, when the ad enters the view, not every time its view appears.", in: reportedRenderBids)
             return
         }
         EventManager.shared.push(event: .render(event))
+    }
+
+    private func logRepeat(_ message: @autoclosure () -> String, in bids: ReportedBids) {
+        if bids.isFirstRepeat() {
+            Logger.warning("\(message()) Further repeats are logged at debug level.")
+        } else {
+            Logger.debug(message())
+        }
     }
 
     public func flush() {
