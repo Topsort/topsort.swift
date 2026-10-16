@@ -9,6 +9,37 @@ public enum EntityType: String, Codable {
     case vendor
 }
 
+/// The device the user is on.
+public enum DeviceType: String, Codable {
+    case desktop
+    case mobile
+}
+
+/// Where the event occurred.
+public enum Channel: String, Codable {
+    case onsite
+    case offsite
+    case instore
+}
+
+/// The specific flavor of a click on a sponsored listing.
+public enum ClickType: String, Codable {
+    case product
+    case like
+    case addToCart = "add-to-cart"
+}
+
+/// The type of page an event or auction occurred on.
+public enum PageType: String, Codable {
+    case home
+    case category
+    /// Product detail page.
+    case pdp = "PDP"
+    case search
+    case cart
+    case other
+}
+
 public struct Placement: Codable {
     /**
      URL path of the page triggering the event.
@@ -73,23 +104,23 @@ public struct Entity: Codable {
 }
 
 /// Page context for pageview events and auction requests.
-/// Valid page types: "home", "category", "PDP", "search", "cart", "other".
 public struct Page: Codable {
-    /// The type of page (e.g. "category", "product", "search", "home", "cart").
-    public let type: String
+    /// The type of page.
+    public let type: PageType
     /// An identifier for the page (required by the API).
     public let pageId: String
     /// A single value (e.g. category name, search query) or an array of values
     /// (e.g. product IDs for cart pages). The API accepts either format under the `value` key.
     public let value: PageValue?
 
-    public init(type: String, pageId: String, value: String? = nil) {
+    public init(type: PageType, pageId: String, value: String? = nil) {
         self.type = type
         self.pageId = pageId
         self.value = value.map { .string($0) }
     }
 
-    public init(type: String, pageId: String, values: [String]) {
+    /// An array value is only valid for `.cart` (the items in the cart), and must not be empty.
+    public init(type: PageType, pageId: String, values: [String]) {
         self.type = type
         self.pageId = pageId
         value = .array(values)
@@ -172,17 +203,15 @@ public struct Event: Codable {
     /// Page context for the event.
     let page: Page?
 
-    /// Device type: "desktop" or "mobile".
-    let deviceType: String?
+    let deviceType: DeviceType?
 
-    /// Channel: "onsite", "offsite", or "instore".
-    let channel: String?
+    let channel: Channel?
 
     /// Additional entity for halo attribution. Requires resolvedBidId to be set.
     let additionalAttribution: Entity?
 
-    /// Click type: "product", "like", or "add-to-cart". Only applicable for click events.
-    let clickType: String?
+    /// Only applicable for click events.
+    let clickType: ClickType?
 
     public init(
         entity: Entity,
@@ -190,10 +219,10 @@ public struct Event: Codable {
         opaqueUserId: String = Topsort.shared.opaqueUserId,
         placement: Placement? = nil,
         page: Page? = nil,
-        deviceType: String? = nil,
-        channel: String? = nil,
+        deviceType: DeviceType? = nil,
+        channel: Channel? = nil,
         additionalAttribution: Entity? = nil,
-        clickType: String? = nil,
+        clickType: ClickType? = nil,
         id: String = UUID().uuidString
     ) {
         self.entity = entity
@@ -215,10 +244,10 @@ public struct Event: Codable {
         opaqueUserId: String = Topsort.shared.opaqueUserId,
         placement: Placement? = nil,
         page: Page? = nil,
-        deviceType: String? = nil,
-        channel: String? = nil,
+        deviceType: DeviceType? = nil,
+        channel: Channel? = nil,
         additionalAttribution: Entity? = nil,
-        clickType: String? = nil,
+        clickType: ClickType? = nil,
         id: String = UUID().uuidString
     ) {
         entity = nil
@@ -266,11 +295,9 @@ public struct RenderEvent: Codable {
     /// Page context for the event.
     let page: Page?
 
-    /// Device type: "desktop" or "mobile".
-    let deviceType: String?
+    let deviceType: DeviceType?
 
-    /// Channel: "onsite", "offsite", or "instore".
-    let channel: String?
+    let channel: Channel?
 
     public init(
         resolvedBidId: String,
@@ -278,8 +305,8 @@ public struct RenderEvent: Codable {
         opaqueUserId: String = Topsort.shared.opaqueUserId,
         placement: Placement? = nil,
         page: Page? = nil,
-        deviceType: String? = nil,
-        channel: String? = nil,
+        deviceType: DeviceType? = nil,
+        channel: Channel? = nil,
         id: String = UUID().uuidString
     ) {
         self.resolvedBidId = resolvedBidId
@@ -353,11 +380,9 @@ public struct VideoEvent: Codable {
     /// Page context for the event.
     let page: Page?
 
-    /// Device type: "desktop" or "mobile".
-    let deviceType: String?
+    let deviceType: DeviceType?
 
-    /// Channel: "onsite", "offsite", or "instore".
-    let channel: String?
+    let channel: Channel?
 
     /// Reports that playback reached `checkpoint`.
     public init(
@@ -367,8 +392,8 @@ public struct VideoEvent: Codable {
         opaqueUserId: String = Topsort.shared.opaqueUserId,
         placement: Placement? = nil,
         page: Page? = nil,
-        deviceType: String? = nil,
-        channel: String? = nil,
+        deviceType: DeviceType? = nil,
+        channel: Channel? = nil,
         id: String = UUID().uuidString
     ) {
         self.init(
@@ -385,8 +410,8 @@ public struct VideoEvent: Codable {
         opaqueUserId: String = Topsort.shared.opaqueUserId,
         placement: Placement? = nil,
         page: Page? = nil,
-        deviceType: String? = nil,
-        channel: String? = nil,
+        deviceType: DeviceType? = nil,
+        channel: Channel? = nil,
         id: String = UUID().uuidString
     ) {
         self.init(
@@ -403,8 +428,8 @@ public struct VideoEvent: Codable {
         opaqueUserId: String,
         placement: Placement?,
         page: Page?,
-        deviceType: String?,
-        channel: String?,
+        deviceType: DeviceType?,
+        channel: Channel?,
         id: String
     ) {
         self.resolvedBidId = resolvedBidId
@@ -460,18 +485,16 @@ public struct PurchaseEvent: Codable {
      */
     let id: String
 
-    /// Device type: "desktop" or "mobile".
-    let deviceType: String?
+    let deviceType: DeviceType?
 
-    /// Channel: "onsite", "offsite", or "instore".
-    let channel: String?
+    let channel: Channel?
 
     public init(
         items: [PurchaseItem],
         occurredAt: Date,
         opaqueUserId: String = Topsort.shared.opaqueUserId,
-        deviceType: String? = nil,
-        channel: String? = nil,
+        deviceType: DeviceType? = nil,
+        channel: Channel? = nil,
         id: String = UUID().uuidString
     ) {
         self.items = items
@@ -492,18 +515,16 @@ public struct PageViewEvent: Codable {
     let id: String
     let page: Page
 
-    /// Device type: "desktop" or "mobile".
-    let deviceType: String?
+    let deviceType: DeviceType?
 
-    /// Channel: "onsite", "offsite", or "instore".
-    let channel: String?
+    let channel: Channel?
 
     public init(
         page: Page,
         occurredAt: Date,
         opaqueUserId: String = Topsort.shared.opaqueUserId,
-        deviceType: String? = nil,
-        channel: String? = nil,
+        deviceType: DeviceType? = nil,
+        channel: Channel? = nil,
         id: String = UUID().uuidString
     ) {
         self.page = page
@@ -584,5 +605,89 @@ struct Events: Codable {
         self.pageviews = pageviews
         self.renders = renders
         self.videoEvents = videoEvents
+    }
+}
+
+// MARK: - Spec rules the types cannot express
+
+/// The events API rejects a whole request, with a non-retriable 400, when any one event in it
+/// breaks the spec. These are the rules the Swift types do not already enforce; an event that
+/// breaks one is dropped on its own, before it can take its batch down with it.
+protocol SpecValidated {
+    /// A description of the first rule this value breaks, or nil when it is valid.
+    var specViolation: String? { get }
+}
+
+extension Placement: SpecValidated {
+    var specViolation: String? {
+        if path.isEmpty {
+            return "placement.path is empty"
+        }
+        if let position, position < 1 {
+            return "placement.position \(position) is below 1"
+        }
+        if let page, page < 1 {
+            return "placement.page \(page) is below 1"
+        }
+        if let pageSize, pageSize < 1 {
+            return "placement.pageSize \(pageSize) is below 1"
+        }
+        if productId?.isEmpty == true {
+            return "placement.productId is empty"
+        }
+        if categoryIds?.isEmpty == true {
+            return "placement.categoryIds is empty"
+        }
+        if searchQuery?.isEmpty == true {
+            return "placement.searchQuery is empty"
+        }
+        return nil
+    }
+}
+
+extension Page: SpecValidated {
+    var specViolation: String? {
+        if value?.arrayValue?.isEmpty == true {
+            return "page.value is an empty array"
+        }
+        return nil
+    }
+}
+
+/// The checks every event shares: a non-empty `id` (the API dedupes on it) and valid context.
+private func contextViolation(id: String, placement: Placement?, page: Page?) -> String? {
+    if id.isEmpty {
+        return "id is empty"
+    }
+    return placement?.specViolation ?? page?.specViolation
+}
+
+extension Event: SpecValidated {
+    var specViolation: String? {
+        contextViolation(id: id, placement: placement, page: page)
+    }
+}
+
+extension RenderEvent: SpecValidated {
+    var specViolation: String? {
+        contextViolation(id: id, placement: placement, page: page)
+    }
+}
+
+extension VideoEvent: SpecValidated {
+    var specViolation: String? {
+        contextViolation(id: id, placement: placement, page: page)
+    }
+}
+
+extension PurchaseEvent: SpecValidated {
+    var specViolation: String? {
+        contextViolation(id: id, placement: nil, page: nil)
+    }
+}
+
+extension PageViewEvent: SpecValidated {
+    var specViolation: String? {
+        contextViolation(id: id, placement: nil, page: page)
     }
 }
