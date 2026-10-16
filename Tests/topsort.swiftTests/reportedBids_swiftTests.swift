@@ -4,26 +4,33 @@ import XCTest
 class ReportedBidsTests: XCTestCase {
     func testFirstReportPassesAndRepeatIsCaught() {
         let bids = ReportedBids()
-        XCTAssertTrue(bids.markReported("bid-1"))
-        XCTAssertFalse(bids.markReported("bid-1"))
-        XCTAssertTrue(bids.markReported("bid-2"), "other bids are unaffected")
+        XCTAssertTrue(bids.markReported("bid-1", for: "user-1"))
+        XCTAssertFalse(bids.markReported("bid-1", for: "user-1"))
+        XCTAssertTrue(bids.markReported("bid-2", for: "user-1"), "other bids are unaffected")
+    }
+
+    func testTheSameBidForAnotherUserIsNotARepeat() {
+        let bids = ReportedBids()
+        XCTAssertTrue(bids.markReported("bid-1", for: "user-1"))
+        XCTAssertTrue(bids.markReported("bid-1", for: "user-2"))
+        XCTAssertFalse(bids.markReported("bid-1", for: "user-1"))
     }
 
     func testClearForgetsEveryBid() {
         let bids = ReportedBids()
-        _ = bids.markReported("bid-1")
+        _ = bids.markReported("bid-1", for: "user-1")
         bids.clear()
-        XCTAssertTrue(bids.markReported("bid-1"))
+        XCTAssertTrue(bids.markReported("bid-1", for: "user-1"))
     }
 
     func testPastCapacityTheLeastRecentlyReportedBidIsForgotten() {
         let bids = ReportedBids(capacity: 2)
-        _ = bids.markReported("a")
-        _ = bids.markReported("b")
-        XCTAssertFalse(bids.markReported("a"), "a repeat makes a the most recent")
-        _ = bids.markReported("c")
-        XCTAssertFalse(bids.markReported("a"), "a was reported more recently than b")
-        XCTAssertTrue(bids.markReported("b"), "b was the least recent, so c evicted it")
+        _ = bids.markReported("a", for: "user-1")
+        _ = bids.markReported("b", for: "user-1")
+        XCTAssertFalse(bids.markReported("a", for: "user-1"), "a repeat makes a the most recent")
+        _ = bids.markReported("c", for: "user-1")
+        XCTAssertFalse(bids.markReported("a", for: "user-1"), "a was reported more recently than b")
+        XCTAssertTrue(bids.markReported("b", for: "user-1"), "b was the least recent, so c evicted it")
     }
 
     func testConcurrentReportsOfOneBidLetExactlyOneThrough() {
@@ -31,7 +38,7 @@ class ReportedBidsTests: XCTestCase {
         let lock = NSLock()
         var firsts = 0
         DispatchQueue.concurrentPerform(iterations: 1000) { _ in
-            if bids.markReported("bid-1") {
+            if bids.markReported("bid-1", for: "user-1") {
                 lock.withLock { firsts += 1 }
             }
         }
@@ -133,55 +140,40 @@ class TopsortRepeatReportTests: XCTestCase {
         XCTAssertEqual(count(.impression, in: queued()), 1)
     }
 
-    func testANewUserIdForgetsReportedBids() {
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        Topsort.shared.track(render: RenderEvent(resolvedBidId: "bid-1", occurredAt: Date.now))
-        Topsort.shared.set(opaqueUserId: "user-2")
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        Topsort.shared.track(render: RenderEvent(resolvedBidId: "bid-1", occurredAt: Date.now))
+    /// A shared device or kiosk passes each user's id on the event and never changes the
+    /// facade's: each user's report of the bid is their own.
+    func testEachUsersReportOfTheSameBidIsSent() {
+        for user in ["user-a", "user-b", "user-a"] {
+            Topsort.shared.track(impression: Event(resolvedBidId: "bid-1", occurredAt: Date.now, opaqueUserId: user))
+            Topsort.shared.track(render: RenderEvent(resolvedBidId: "bid-1", occurredAt: Date.now, opaqueUserId: user))
+        }
         let items = queued()
-        XCTAssertEqual(count(.impression, in: items), 2)
+        XCTAssertEqual(count(.impression, in: items), 2, "user-a's second report is a repeat")
         XCTAssertEqual(count(.render, in: items), 2)
     }
 
-    func testSettingANilUserIdMintsANewOneAndForgetsReportedBids() {
+    func testANewFacadeUserIdReportsTheBidAgain() {
         Topsort.shared.track(impression: impression(bid: "bid-1"))
-        Topsort.shared.set(opaqueUserId: nil)
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        XCTAssertEqual(count(.impression, in: queued()), 2)
-    }
-
-    func testSettingTheSameUserIdKeepsReportedBids() {
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        Topsort.shared.set(opaqueUserId: "user-1")
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        XCTAssertEqual(count(.impression, in: queued()), 1)
-    }
-
-    func testReconfiguringWithTheSameIdentityKeepsReportedBids() throws {
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        try Topsort.shared.configure(Configuration(apiKey: "refreshed-key"))
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        XCTAssertEqual(count(.impression, in: queued()), 1)
-    }
-
-    func testSwitchingIdentityModeForgetsReportedBids() throws {
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        var config = Configuration(apiKey: "test-key")
-        config.identity = .ephemeral
-        try Topsort.shared.configure(config)
-        EventManager.shared.flushAt = 10000
+        Topsort.shared.set(opaqueUserId: "user-2")
         Topsort.shared.track(impression: impression(bid: "bid-1"))
         XCTAssertEqual(count(.impression, in: queued()), 2)
     }
 
-    func testLeavingEphemeralIdentityForgetsReportedBids() throws {
+    /// An event built before a user switch and tracked after it still belongs to the user it was
+    /// built for, so it is that user's repeat.
+    func testAnEventIsCheckedAgainstTheUserItCarries() {
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        let builtBeforeTheSwitch = impression(bid: "bid-1")
+        Topsort.shared.set(opaqueUserId: "user-2")
+        Topsort.shared.track(impression: builtBeforeTheSwitch)
+        XCTAssertEqual(count(.impression, in: queued()), 1)
+    }
+
+    func testSwitchingIdentityModeReportsTheBidAgain() throws {
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
         var config = Configuration(apiKey: "test-key")
         config.identity = .ephemeral
         try Topsort.shared.configure(config)
-        EventManager.shared.flushAt = 10000
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        try Topsort.shared.configure(Configuration(apiKey: "test-key"))
         EventManager.shared.flushAt = 10000
         Topsort.shared.track(impression: impression(bid: "bid-1"))
         XCTAssertEqual(count(.impression, in: queued()), 2)
