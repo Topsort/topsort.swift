@@ -51,15 +51,36 @@ public class Topsort: TopsortProtocol {
         }
     }
 
+    /// Promoted impressions and renders already reported; see `ReportedBids`.
+    let reportedImpressionBids = ReportedBids()
+    let reportedRenderBids = ReportedBids()
+
     private init() {}
     /// Under `.ephemeral` the id is held in memory only; `nil` mints a new one either way.
     public func set(opaqueUserId: String?) {
-        identityLock.withLock {
+        let newId = opaqueUserId ?? Self.newOpaqueUserId()
+        let previousId: String? = identityLock.withLock {
             switch identity {
-            case .ephemeral: ephemeralOpaqueUserId = opaqueUserId ?? Self.newOpaqueUserId()
-            case .persisted: _opaqueUserId = opaqueUserId ?? Self.newOpaqueUserId()
+            case .ephemeral:
+                let previousId = ephemeralOpaqueUserId
+                ephemeralOpaqueUserId = newId
+                return previousId
+            case .persisted:
+                let previousId = _opaqueUserId
+                _opaqueUserId = newId
+                return previousId
             }
         }
+        if previousId != newId {
+            forgetReportedBids()
+        }
+    }
+
+    /// A different user's renders and impressions are their own and must not be dropped as
+    /// repeats of the previous user's. Setting the same id again keeps the bids.
+    private func forgetReportedBids() {
+        reportedImpressionBids.clear()
+        reportedRenderBids.clear()
     }
 
     public func configure(_ configuration: Configuration) throws(ConfigurationError) {
@@ -71,7 +92,10 @@ public class Topsort: TopsortProtocol {
             onEventsDiscarded: configuration.onEventsDiscarded
         )
         Logger.logLevel = configuration.logLevel
-        identityLock.withLock {
+        // Switching identity mode always changes the user id in effect: entering ephemeral drops
+        // both ids, and leaving it mints a new persisted one.
+        let identityChanged: Bool = identityLock.withLock {
+            let identityChanged = configuration.identity != identity
             // Entering ephemeral forgets the stored id (the file is removed asynchronously) and
             // any id set before this call. A reconfigure that is already ephemeral keeps the
             // process's id, so an impression and its click stay linked across a token refresh.
@@ -80,6 +104,10 @@ public class Topsort: TopsortProtocol {
                 ephemeralOpaqueUserId = nil
             }
             identity = configuration.identity
+            return identityChanged
+        }
+        if identityChanged {
+            forgetReportedBids()
         }
         try AuctionManager.shared.configure(apiKey: configuration.apiKey, url: configuration.url)
         if let timeout = configuration.auctionsTimeout {
@@ -99,6 +127,11 @@ public class Topsort: TopsortProtocol {
     public func track(impression event: Event) {
         guard isConfigured else {
             Logger.warning("track(impression:) called before configure(). Event dropped.")
+            return
+        }
+        // Organic impressions carry no bid and legitimately repeat as a product reappears.
+        if let bidId = event.resolvedBidId, !reportedImpressionBids.markReported(bidId) {
+            Logger.warning("Dropping a repeat impression for resolvedBidId \(bidId). A resolved bid earns one impression; report it once, when the ad is shown, not every time its view appears.")
             return
         }
         EventManager.shared.push(event: .impression(event))
@@ -131,6 +164,10 @@ public class Topsort: TopsortProtocol {
     public func track(render event: RenderEvent) {
         guard isConfigured else {
             Logger.warning("track(render:) called before configure(). Event dropped.")
+            return
+        }
+        if !reportedRenderBids.markReported(event.resolvedBidId) {
+            Logger.warning("Dropping a repeat render for resolvedBidId \(event.resolvedBidId). A resolved bid earns one render; report it once, when the ad enters the view, not every time its view appears.")
             return
         }
         EventManager.shared.push(event: .render(event))
