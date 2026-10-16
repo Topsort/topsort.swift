@@ -129,7 +129,7 @@ Topsort.shared.track(click: event)       // on tap
 
 Report each impression once per `resolvedBidId`, when the creative is on screen. Both initializers also take optional context: `placement`, `page`, `deviceType`, `channel`, `additionalAttribution` (a product or vendor `Entity` to attribute purchases to besides the ad's own; only meaningful with `resolvedBidId`) and, for clicks, `clickType` (`"product"`, `"like"`, `"add-to-cart"`).
 
-`Topsort.shared` enforces the once-per-bid rule for impressions and renders: it sends the first report of each `resolvedBidId` for each `opaqueUserId` and drops any later one in the same process, logging a warning the first time. If the first report could not be delivered (the queue gave up on it), the next one is sent. That includes showing the same winner again, from a cached auction response, in a second placement or after navigating back: only the first report is sent. Organic impressions and clicks are never dropped, and `TopsortClient` sends everything it is given.
+`Topsort.shared` enforces the once-per-bid rule for impressions and renders: it sends the first report of each `resolvedBidId` for each `opaqueUserId` and drops any later one in the same process, logging a warning the first time. That includes showing the same winner again, from a cached auction response, in a second placement or after navigating back: only the first report is sent. If the first report could not be delivered (the queue gave up on it), the next one is sent. Organic impressions and clicks are never dropped, and `TopsortClient` sends everything it is given.
 
 #### Purchases
 
