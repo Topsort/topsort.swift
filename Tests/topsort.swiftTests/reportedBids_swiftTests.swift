@@ -66,6 +66,16 @@ class ReportedBidsTests: XCTestCase {
         XCTAssertTrue(bids.markReported("evicted", for: "user-1"), "the least recent went first")
     }
 
+    func testUnmarkForgetsOneReportOnly() {
+        let bids = ReportedBids()
+        _ = bids.markReported("bid-1", for: "user-1")
+        _ = bids.markReported("bid-1", for: "user-2")
+        bids.unmark("bid-1", for: "user-1")
+        bids.unmark("never-reported", for: "user-1")
+        XCTAssertTrue(bids.markReported("bid-1", for: "user-1"))
+        XCTAssertFalse(bids.markReported("bid-1", for: "user-2"))
+    }
+
     func testClearThenReportStartsAFreshOrder() {
         let bids = ReportedBids(capacity: 2)
         _ = bids.markReported("a", for: "user-1")
@@ -87,6 +97,11 @@ class ReportedBidsTests: XCTestCase {
             var model: [String] = []
             for step in 0 ..< 5000 {
                 let bid = "bid-\(Int.random(in: 0 ..< capacity * 2 + 1, using: &rng))"
+                if Int.random(in: 0 ..< 5, using: &rng) == 0 {
+                    model.removeAll { $0 == bid }
+                    bids.unmark(bid, for: "user-1")
+                    continue
+                }
                 let expected: Bool
                 if let index = model.firstIndex(of: bid) {
                     model.remove(at: index)
@@ -119,12 +134,14 @@ class ReportedBidsTests: XCTestCase {
 /// Repeat reports through the `Topsort.shared` facade, read back from the event queue. The
 /// network is down so nothing leaves the queue while a test inspects it.
 class TopsortRepeatReportTests: XCTestCase {
+    private var originalClient: HTTPClient!
     #if canImport(Network)
         private var originalNetworkMonitor: NetworkMonitoring!
     #endif
 
     override func setUp() {
         super.setUp()
+        originalClient = EventManager.shared.client
         EventManager.shared.client = MockHTTPClient(apiKey: "test-key", postResult: .success(Data()))
         #if canImport(Network)
             originalNetworkMonitor = EventManager.shared.networkMonitor
@@ -137,6 +154,7 @@ class TopsortRepeatReportTests: XCTestCase {
         // Let pushes an earlier suite left in flight land before the queue is emptied.
         EventManager.shared.flushAndPersist()
         EventManager.shared._eventQueue = []
+        EventManager.shared._pendingEvents = [:]
         Topsort.shared.reportedImpressionBids.clear()
         Topsort.shared.reportedRenderBids.clear()
     }
@@ -147,6 +165,8 @@ class TopsortRepeatReportTests: XCTestCase {
         try? Topsort.shared.configure(Configuration(apiKey: "test-key"))
         EventManager.shared.flushAndPersist()
         EventManager.shared._eventQueue = []
+        EventManager.shared._pendingEvents = [:]
+        EventManager.shared.client = originalClient
         #if canImport(Network)
             EventManager.shared.networkMonitor = originalNetworkMonitor
         #endif
@@ -226,4 +246,65 @@ class TopsortRepeatReportTests: XCTestCase {
         XCTAssertEqual(count(.impression, in: items), 2, "user-a's second report is a repeat")
         XCTAssertEqual(count(.render, in: items), 2)
     }
+
+    // MARK: - Reports the queue gave up on
+
+    /// A send and its response each run as their own block on the event manager's serial queue,
+    /// the response enqueued while the send runs, so it takes two barriers to see it applied.
+    private func drain() {
+        EventManager.shared.flushAndPersist()
+        EventManager.shared.flushAndPersist()
+    }
+
+    private func promotedImpressions(of bid: String, in items: [EventItem]) -> Int {
+        items.filter { item in
+            if case let .impression(event) = item {
+                return event.resolvedBidId == bid
+            }
+            return false
+        }.count
+    }
+
+    func testAnImpressionEvictedFromAFullQueueCanBeReportedAgain() {
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        let filler = EventItem.impression(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now, opaqueUserId: "user-1"))
+        EventManager.shared._eventQueue = queued() + Array(repeating: filler, count: MAX_QUEUED_EVENTS)
+        EventManager.shared.push(event: filler) // past capacity: the oldest, bid-1's impression, is evicted
+        EventManager.shared.flushAndPersist() // the eviction has run
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        XCTAssertEqual(promotedImpressions(of: "bid-1", in: queued()), 1)
+    }
+
+    #if canImport(Network)
+        private func goOnline(failingWith statusCode: Int) -> MockHTTPClient {
+            let client = MockHTTPClient(apiKey: "test-key", postResult: .failure(.statusCode(code: statusCode, data: nil)))
+            EventManager.shared.client = client
+            let online = MockNetworkMonitor()
+            online.isConnected = true
+            EventManager.shared.networkMonitor = online
+            return client
+        }
+
+        func testAnImpressionTheAPIRejectedCanBeReportedAgain() {
+            let client = goOnline(failingWith: 400)
+            EventManager.shared.flushAt = 1
+            Topsort.shared.track(impression: impression(bid: "bid-1"))
+            drain()
+            Topsort.shared.track(impression: impression(bid: "bid-1"))
+            drain()
+            XCTAssertEqual(client.postCallCount, 2, "the rejected report was forgotten, so the second one is sent")
+        }
+
+        func testAnImpressionWhoseRetriesRanOutCanBeReportedAgain() throws {
+            XCTAssertTrue(Topsort.shared.reportedImpressionBids.markReported("bid-1", for: "user-1"))
+            let client = goOnline(failingWith: 500)
+            let id = UUID()
+            let stale = Date(timeIntervalSinceNow: -100_000)
+            let body = try JSONEncoder().encode(Events(impressions: [impression(bid: "bid-1")]))
+            EventManager.shared._pendingEvents = [id: PendingEvents(id: id, data: body, createdAt: stale, retries: MAX_RETRIES, lastRetry: stale)]
+            drain()
+            XCTAssertEqual(client.postCallCount, 1)
+            XCTAssertTrue(Topsort.shared.reportedImpressionBids.markReported("bid-1", for: "user-1"), "the retired batch's bid was forgotten")
+        }
+    #endif
 }

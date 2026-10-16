@@ -73,6 +73,16 @@ final class ReportedBids {
         }
     }
 
+    /// Forgets the report of `resolvedBidId` for `opaqueUserId`, so the next one is sent. Called
+    /// when the event queue gives up on the event: the API never accepted the first report.
+    func unmark(_ resolvedBidId: String, for opaqueUserId: String) {
+        let key = Key(opaqueUserId: opaqueUserId, resolvedBidId: resolvedBidId)
+        lock.withLock {
+            guard let node = nodes.removeValue(forKey: key) else { return }
+            unlink(node)
+        }
+    }
+
     /// Must hold `lock`.
     private func unlink(_ node: Node) {
         if let older = node.older {

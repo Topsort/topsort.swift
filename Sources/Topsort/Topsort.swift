@@ -149,6 +149,23 @@ public class Topsort: TopsortProtocol {
         EventManager.shared.push(event: .render(event))
     }
 
+    /// Called by `EventManager` with the events it gave up on. The API never accepted their
+    /// impressions and renders, so the next report of each bid for its user must be sent, not dropped.
+    func forgetReports(in items: [EventItem]) {
+        for item in items {
+            switch item {
+            case let .impression(event):
+                if let bidId = event.resolvedBidId {
+                    reportedImpressionBids.unmark(bidId, for: event.opaqueUserId)
+                }
+            case let .render(event):
+                reportedRenderBids.unmark(event.resolvedBidId, for: event.opaqueUserId)
+            case .click, .purchase, .pageview:
+                break
+            }
+        }
+    }
+
     private func logRepeat(_ message: @autoclosure () -> String, in bids: ReportedBids) {
         if bids.isFirstRepeat() {
             Logger.warning("\(message()) Further repeats are logged at debug level.")
