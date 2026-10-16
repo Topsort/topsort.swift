@@ -87,14 +87,13 @@ class TopsortRepeatReportTests: XCTestCase {
         // Let pushes an earlier suite left in flight land before the queue is emptied.
         EventManager.shared.flushAndPersist()
         EventManager.shared._eventQueue = []
-        Topsort.shared.set(opaqueUserId: "user-1")
         Topsort.shared.reportedImpressionBids.clear()
         Topsort.shared.reportedRenderBids.clear()
     }
 
     override func tearDown() {
         Topsort.shared.isConfigured = true
-        // Back to the default identity and flush threshold, for the suites that follow.
+        // Back to the default flush threshold, for the suites that follow.
         try? Topsort.shared.configure(Configuration(apiKey: "test-key"))
         EventManager.shared.flushAndPersist()
         EventManager.shared._eventQueue = []
@@ -116,8 +115,14 @@ class TopsortRepeatReportTests: XCTestCase {
         items.filter { $0.kind == kind }.count
     }
 
-    private func impression(bid: String) -> Event {
-        Event(resolvedBidId: bid, occurredAt: Date.now)
+    /// Every event names its user. The initializers' default reads `Topsort.shared`'s id, which
+    /// mints and stores one on disk; these tests leave the shared identity alone.
+    private func impression(bid: String, user: String = "user-1") -> Event {
+        Event(resolvedBidId: bid, occurredAt: Date.now, opaqueUserId: user)
+    }
+
+    private func render(bid: String, user: String = "user-1") -> RenderEvent {
+        RenderEvent(resolvedBidId: bid, occurredAt: Date.now, opaqueUserId: user)
     }
 
     func testRepeatPromotedImpressionIsDropped() {
@@ -128,13 +133,13 @@ class TopsortRepeatReportTests: XCTestCase {
     }
 
     func testRepeatRenderIsDropped() {
-        Topsort.shared.track(render: RenderEvent(resolvedBidId: "bid-1", occurredAt: Date.now))
-        Topsort.shared.track(render: RenderEvent(resolvedBidId: "bid-1", occurredAt: Date.now))
+        Topsort.shared.track(render: render(bid: "bid-1"))
+        Topsort.shared.track(render: render(bid: "bid-1"))
         XCTAssertEqual(count(.render, in: queued()), 1)
     }
 
     func testRenderDoesNotUseUpTheImpressionOfItsBid() {
-        Topsort.shared.track(render: RenderEvent(resolvedBidId: "bid-1", occurredAt: Date.now))
+        Topsort.shared.track(render: render(bid: "bid-1"))
         Topsort.shared.track(impression: impression(bid: "bid-1"))
         let items = queued()
         XCTAssertEqual(count(.render, in: items), 1)
@@ -142,7 +147,7 @@ class TopsortRepeatReportTests: XCTestCase {
     }
 
     func testOrganicImpressionsAndClicksAreNeverDropped() {
-        let organic = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+        let organic = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now, opaqueUserId: "user-1")
         Topsort.shared.track(impression: organic)
         Topsort.shared.track(impression: organic)
         Topsort.shared.track(click: impression(bid: "bid-1"))
@@ -164,38 +169,11 @@ class TopsortRepeatReportTests: XCTestCase {
     /// facade's: each user's report of the bid is their own.
     func testEachUsersReportOfTheSameBidIsSent() {
         for user in ["user-a", "user-b", "user-a"] {
-            Topsort.shared.track(impression: Event(resolvedBidId: "bid-1", occurredAt: Date.now, opaqueUserId: user))
-            Topsort.shared.track(render: RenderEvent(resolvedBidId: "bid-1", occurredAt: Date.now, opaqueUserId: user))
+            Topsort.shared.track(impression: impression(bid: "bid-1", user: user))
+            Topsort.shared.track(render: render(bid: "bid-1", user: user))
         }
         let items = queued()
         XCTAssertEqual(count(.impression, in: items), 2, "user-a's second report is a repeat")
         XCTAssertEqual(count(.render, in: items), 2)
-    }
-
-    func testANewFacadeUserIdReportsTheBidAgain() {
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        Topsort.shared.set(opaqueUserId: "user-2")
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        XCTAssertEqual(count(.impression, in: queued()), 2)
-    }
-
-    /// An event built before a user switch and tracked after it still belongs to the user it was
-    /// built for, so it is that user's repeat.
-    func testAnEventIsCheckedAgainstTheUserItCarries() {
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        let builtBeforeTheSwitch = impression(bid: "bid-1")
-        Topsort.shared.set(opaqueUserId: "user-2")
-        Topsort.shared.track(impression: builtBeforeTheSwitch)
-        XCTAssertEqual(count(.impression, in: queued()), 1)
-    }
-
-    func testSwitchingIdentityModeReportsTheBidAgain() throws {
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        var config = Configuration(apiKey: "test-key")
-        config.identity = .ephemeral
-        try Topsort.shared.configure(config)
-        EventManager.shared.flushAt = 10000
-        Topsort.shared.track(impression: impression(bid: "bid-1"))
-        XCTAssertEqual(count(.impression, in: queued()), 2)
     }
 }
