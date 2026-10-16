@@ -25,21 +25,40 @@ class ReportedBidsTests: XCTestCase {
         XCTAssertFalse(bids.markReported("a"), "a was reported more recently than b")
         XCTAssertTrue(bids.markReported("b"), "b was the least recent, so c evicted it")
     }
+
+    func testConcurrentReportsOfOneBidLetExactlyOneThrough() {
+        let bids = ReportedBids()
+        let lock = NSLock()
+        var firsts = 0
+        DispatchQueue.concurrentPerform(iterations: 1000) { _ in
+            if bids.markReported("bid-1") {
+                lock.withLock { firsts += 1 }
+            }
+        }
+        XCTAssertEqual(firsts, 1)
+    }
 }
 
 /// Repeat reports through the `Topsort.shared` facade, read back from the event queue. The
 /// network is down so nothing leaves the queue while a test inspects it.
 class TopsortRepeatReportTests: XCTestCase {
+    #if canImport(Network)
+        private var originalNetworkMonitor: NetworkMonitoring!
+    #endif
+
     override func setUp() {
         super.setUp()
         EventManager.shared.client = MockHTTPClient(apiKey: "test-key", postResult: .success(Data()))
         #if canImport(Network)
+            originalNetworkMonitor = EventManager.shared.networkMonitor
             let mockNetwork = MockNetworkMonitor()
             mockNetwork.isConnected = false
             EventManager.shared.networkMonitor = mockNetwork
         #endif
         try? Topsort.shared.configure(Configuration(apiKey: "test-key"))
         EventManager.shared.flushAt = 10000
+        // Let pushes an earlier suite left in flight land before the queue is emptied.
+        EventManager.shared.flushAndPersist()
         EventManager.shared._eventQueue = []
         Topsort.shared.set(opaqueUserId: "user-1")
         Topsort.shared.reportedImpressionBids.clear()
@@ -48,35 +67,22 @@ class TopsortRepeatReportTests: XCTestCase {
 
     override func tearDown() {
         Topsort.shared.isConfigured = true
+        // Back to the default identity and flush threshold, for the suites that follow.
+        try? Topsort.shared.configure(Configuration(apiKey: "test-key"))
+        EventManager.shared.flushAndPersist()
         EventManager.shared._eventQueue = []
         #if canImport(Network)
-            let mockNetwork = MockNetworkMonitor()
-            mockNetwork.isConnected = true
-            EventManager.shared.networkMonitor = mockNetwork
+            EventManager.shared.networkMonitor = originalNetworkMonitor
         #endif
         super.tearDown()
     }
 
-    /// Everything tracked before this call, once the event manager has queued it. Pushes run in
-    /// order on its serial queue, so a sentinel pushed last arrives after them.
+    /// Everything tracked before this call. `push` is asynchronous on the event manager's serial
+    /// queue; `flushAndPersist` runs synchronously on that queue, after every earlier push, and
+    /// sends nothing while the network is down.
     private func queued() -> [EventItem] {
-        let sentinel = Event(entity: Entity(type: .product, id: "sentinel"), occurredAt: Date.now, id: "sentinel")
-        EventManager.shared.push(event: .click(sentinel))
-        let arrived = NSPredicate { _, _ in
-            EventManager.shared._eventQueue?.contains { item in
-                if case let .click(event) = item {
-                    return event.id == "sentinel"
-                }
-                return false
-            } ?? false
-        }
-        wait(for: [expectation(for: arrived, evaluatedWith: nil)], timeout: 3)
-        return (EventManager.shared._eventQueue ?? []).filter { item in
-            if case let .click(event) = item {
-                return event.id != "sentinel"
-            }
-            return true
-        }
+        EventManager.shared.flushAndPersist()
+        return EventManager.shared._eventQueue ?? []
     }
 
     private func count(_ kind: EventItemKind, in items: [EventItem]) -> Int {
@@ -138,6 +144,13 @@ class TopsortRepeatReportTests: XCTestCase {
         XCTAssertEqual(count(.render, in: items), 2)
     }
 
+    func testSettingANilUserIdMintsANewOneAndForgetsReportedBids() {
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        Topsort.shared.set(opaqueUserId: nil)
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        XCTAssertEqual(count(.impression, in: queued()), 2)
+    }
+
     func testSettingTheSameUserIdKeepsReportedBids() {
         Topsort.shared.track(impression: impression(bid: "bid-1"))
         Topsort.shared.set(opaqueUserId: "user-1")
@@ -157,6 +170,18 @@ class TopsortRepeatReportTests: XCTestCase {
         var config = Configuration(apiKey: "test-key")
         config.identity = .ephemeral
         try Topsort.shared.configure(config)
+        EventManager.shared.flushAt = 10000
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        XCTAssertEqual(count(.impression, in: queued()), 2)
+    }
+
+    func testLeavingEphemeralIdentityForgetsReportedBids() throws {
+        var config = Configuration(apiKey: "test-key")
+        config.identity = .ephemeral
+        try Topsort.shared.configure(config)
+        EventManager.shared.flushAt = 10000
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        try Topsort.shared.configure(Configuration(apiKey: "test-key"))
         EventManager.shared.flushAt = 10000
         Topsort.shared.track(impression: impression(bid: "bid-1"))
         XCTAssertEqual(count(.impression, in: queued()), 2)
