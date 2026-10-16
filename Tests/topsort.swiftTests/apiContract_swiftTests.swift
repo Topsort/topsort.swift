@@ -167,6 +167,7 @@ class APIContractEventTests: XCTestCase {
         XCTAssertEqual(try idField(PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 1)], occurredAt: Date.now, id: id)), id)
         XCTAssertEqual(try idField(PageViewEvent(page: Page(type: "home", pageId: "home"), occurredAt: Date.now, id: id)), id)
         XCTAssertEqual(try idField(RenderEvent(resolvedBidId: "bid", occurredAt: Date.now, id: id)), id)
+        XCTAssertEqual(try idField(VideoEvent(resolvedBidId: "bid", checkpoint: .start, occurredAt: Date.now, id: id)), id)
         XCTAssertNotNil(UUID(uuidString: Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now).id), "the default must still mint a fresh UUID")
     }
 
@@ -365,6 +366,105 @@ class APIContractEventTests: XCTestCase {
         let events = items.toEvents()
 
         XCTAssertEqual(events.renders?.count, 1)
+        XCTAssertEqual(events.impressions?.count, 1)
+    }
+
+    // MARK: - Video event
+
+    /// The wire values must be exactly the VAST names the API's `eventType` enum accepts; anything
+    /// else is a non-retriable 400 that takes the rest of the batch down with it.
+    func testVideoCheckpointRawValuesMatchTheAPIEnum() {
+        XCTAssertEqual(
+            [VideoCheckpoint.start, .firstQuartile, .midpoint, .thirdQuartile, .complete].map(\.rawValue),
+            ["start", "firstQuartile", "midpoint", "thirdQuartile", "complete"]
+        )
+    }
+
+    func testVideoCheckpointEventEncoding() throws {
+        let video = VideoEvent(
+            resolvedBidId: "bid-abc",
+            checkpoint: .firstQuartile,
+            occurredAt: Date.now,
+            opaqueUserId: "user-123",
+            placement: Placement(path: "/categories/dairy", position: 1),
+            deviceType: "mobile",
+            channel: "onsite"
+        )
+
+        let data = try JSONEncoder().encode(video)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertEqual(json["resolvedBidId"] as? String, "bid-abc")
+        XCTAssertEqual(json["eventType"] as? String, "firstQuartile")
+        XCTAssertNil(json["errorCode"], "errorCode is only sent with an error event")
+        XCTAssertEqual(json["opaqueUserId"] as? String, "user-123")
+        XCTAssertEqual((json["placement"] as? [String: Any])?["path"] as? String, "/categories/dairy")
+        XCTAssertEqual(json["deviceType"] as? String, "mobile")
+        XCTAssertEqual(json["channel"] as? String, "onsite")
+        XCTAssertNotNil(json["id"])
+        XCTAssertNotNil(json["occurredAt"])
+    }
+
+    /// The API requires errorCode when eventType is error, so the error initializer sets both.
+    func testVideoErrorEventEncoding() throws {
+        let video = VideoEvent(resolvedBidId: "bid-abc", errorCode: 405, occurredAt: Date.now, opaqueUserId: "user-123")
+
+        let data = try JSONEncoder().encode(video)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertEqual(json["eventType"] as? String, "error")
+        XCTAssertEqual(json["errorCode"] as? Int, 405)
+    }
+
+    /// Queued events are persisted and decoded again on the next launch.
+    func testVideoEventItemRoundTrips() throws {
+        let item = EventItem.video(VideoEvent(resolvedBidId: "bid-abc", errorCode: 402, occurredAt: Date.now, opaqueUserId: "user-123"))
+
+        let decoded = try JSONDecoder().decode(EventItem.self, from: JSONEncoder().encode(item))
+
+        guard case let .video(video) = decoded else { return XCTFail("expected a video event, got \(decoded)") }
+        XCTAssertEqual(video.resolvedBidId, "bid-abc")
+        XCTAssertEqual(video.eventType, "error")
+        XCTAssertEqual(video.errorCode, 402)
+    }
+
+    // MARK: - Events batch with video events
+
+    func testEventsBatchIncludesVideoEvents() throws {
+        let video = VideoEvent(resolvedBidId: "bid-abc", checkpoint: .complete, occurredAt: Date.now)
+        let events = Events(videoEvents: [video])
+
+        let data = try JSONEncoder().encode(events)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertEqual((json["videoEvents"] as? [Any])?.count, 1)
+    }
+
+    // MARK: - EventItem grouping with video events
+
+    /// toItems is how a batch the queue gave up on is read back to unmark its bids; it must
+    /// return every event in the body, video events included.
+    func testEventsToItemsIncludesVideoEvents() {
+        let video = VideoEvent(resolvedBidId: "bid-v", checkpoint: .start, occurredAt: Date.now, opaqueUserId: "u")
+        let impression = Event(resolvedBidId: "bid-i", occurredAt: Date.now, opaqueUserId: "u")
+        let items = Events(impressions: [impression], videoEvents: [video]).toItems()
+
+        XCTAssertEqual(items.map(\.kind), [.impression, .video])
+    }
+
+    func testEventItemGroupsVideoEvents() {
+        Topsort.shared.set(opaqueUserId: "test-user")
+        let video = VideoEvent(resolvedBidId: "bid-abc", checkpoint: .start, occurredAt: Date.now)
+        let impression = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
+
+        let items: [EventItem] = [
+            .video(video),
+            .impression(impression),
+        ]
+
+        let events = items.toEvents()
+
+        XCTAssertEqual(events.videoEvents?.count, 1)
         XCTAssertEqual(events.impressions?.count, 1)
     }
 }

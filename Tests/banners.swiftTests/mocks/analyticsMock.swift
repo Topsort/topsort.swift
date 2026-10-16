@@ -12,6 +12,7 @@ public class MockTopsort: TopsortProtocol {
     public var trackedPurchases: [PurchaseEvent] = []
     public var trackedPageviews: [PageViewEvent] = []
     public var trackedRenders: [RenderEvent] = []
+    public var trackedVideoEvents: [VideoEvent] = []
 
     public init(executeAuctionsMockResponse: AuctionResponse) {
         self.executeAuctionsMockResponse = executeAuctionsMockResponse
@@ -38,6 +39,10 @@ public class MockTopsort: TopsortProtocol {
 
     public func track(render event: RenderEvent) {
         trackedRenders.append(event)
+    }
+
+    public func track(video event: VideoEvent) {
+        trackedVideoEvents.append(event)
     }
 
     public func flush() {}
