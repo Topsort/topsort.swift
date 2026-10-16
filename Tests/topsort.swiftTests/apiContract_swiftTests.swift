@@ -442,6 +442,16 @@ class APIContractEventTests: XCTestCase {
 
     // MARK: - EventItem grouping with video events
 
+    /// toItems is how a batch the queue gave up on is read back to unmark its bids; it must
+    /// return every event in the body, video events included.
+    func testEventsToItemsIncludesVideoEvents() {
+        let video = VideoEvent(resolvedBidId: "bid-v", checkpoint: .start, occurredAt: Date.now, opaqueUserId: "u")
+        let impression = Event(resolvedBidId: "bid-i", occurredAt: Date.now, opaqueUserId: "u")
+        let items = Events(impressions: [impression], videoEvents: [video]).toItems()
+
+        XCTAssertEqual(items.map(\.kind), [.impression, .video])
+    }
+
     func testEventItemGroupsVideoEvents() {
         Topsort.shared.set(opaqueUserId: "test-user")
         let video = VideoEvent(resolvedBidId: "bid-abc", checkpoint: .start, occurredAt: Date.now)

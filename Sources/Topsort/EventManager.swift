@@ -68,6 +68,19 @@ extension [EventItem] {
     }
 }
 
+extension Events {
+    func toItems() -> [EventItem] {
+        var items: [EventItem] = []
+        items += (impressions ?? []).map { .impression($0) }
+        items += (clicks ?? []).map { .click($0) }
+        items += (purchases ?? []).map { .purchase($0) }
+        items += (pageviews ?? []).map { .pageview($0) }
+        items += (renders ?? []).map { .render($0) }
+        items += (videoEvents ?? []).map { .video($0) }
+        return items
+    }
+}
+
 struct PendingEvents: Codable {
     let id: UUID
     let data: Data
@@ -242,8 +255,10 @@ class EventManager {
             self.eventQueue.append(event)
             if self.eventQueue.count > MAX_QUEUED_EVENTS {
                 let dropped = self.eventQueue.count - MAX_QUEUED_EVENTS
+                let evicted = Array(self.eventQueue.prefix(dropped))
                 self.eventQueue.removeFirst(dropped)
                 self.discarded(dropped, reason: .queueOverCapacity)
+                self.lost(evicted)
                 // Logged once per episode: at capacity every push sheds an event, and one
                 // line per event would drown the log during a long outage.
                 if !self.queueAtCapacityLogged {
@@ -349,6 +364,7 @@ class EventManager {
         let encodable = valid.filter { (try? encoder.encode($0)) != nil }
         Logger.error("Dropping \(valid.count - encodable.count) events that cannot be serialized")
         discarded(valid.count - encodable.count, reason: .unserializable)
+        lost(valid.filter { (try? encoder.encode($0)) == nil })
         guard !encodable.isEmpty else {
             return nil
         }
@@ -378,11 +394,13 @@ class EventManager {
                         let batch = self.pendingEvents.removeValue(forKey: id)
                         Logger.error("Dropping events after \(MAX_RETRIES) failed retries: \(error)")
                         self.discarded(max(batch?.eventCount ?? 0, 1), reason: .retriesExhausted)
+                        self.lost(batch)
                     }
                 } else {
                     let batch = self.pendingEvents.removeValue(forKey: id)
                     Logger.error("Failed to send events (non-retriable): \(error)")
                     self.discarded(max(batch?.eventCount ?? 0, 1), reason: .permanentlyRejected)
+                    self.lost(batch)
                 }
             }
         }
@@ -393,6 +411,20 @@ class EventManager {
     private func discarded(_ count: Int, reason: DiscardReason) {
         guard count > 0, let onEventsDiscarded else { return }
         onEventsDiscarded(reason, count)
+    }
+
+    /// Must be called on serialQueue. The API never accepted events given up on, so `Topsort` must
+    /// not treat their bids as reported: the next report of each is sent rather than dropped.
+    private func lost(_ items: [EventItem]) {
+        guard !items.isEmpty else { return }
+        Topsort.shared.forgetReports(in: items)
+    }
+
+    /// Must be called on serialQueue. A batch whose stored body no longer decodes has nothing to
+    /// forget that can be identified.
+    private func lost(_ batch: PendingEvents?) {
+        guard let batch, let events = try? JSONDecoder().decode(Events.self, from: batch.data) else { return }
+        lost(events.toItems())
     }
 
     /// Must be called on serialQueue
