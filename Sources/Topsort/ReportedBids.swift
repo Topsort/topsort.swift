@@ -21,15 +21,30 @@ import Foundation
 final class ReportedBids {
     static let defaultCapacity = 512
 
-    private struct Key: Equatable {
+    private struct Key: Hashable {
         let opaqueUserId: String
         let resolvedBidId: String
     }
 
+    /// A reported bid's place in the recency order. The list runs from `oldest` to `newest`,
+    /// strong toward the newest end and weak back, so it holds no retain cycle.
+    private final class Node {
+        let key: Key
+        var newer: Node?
+        weak var older: Node?
+
+        init(_ key: Key) {
+            self.key = key
+        }
+    }
+
     private let capacity: Int
     private let lock = NSLock()
-    /// Least recently reported first. A linear scan is cheap at this size.
-    private var reported: [Key] = []
+    // A dictionary for the lookup and a linked list for the order: every operation is O(1),
+    // as with topsort.kt's access-ordered LinkedHashMap. Guarded by `lock`.
+    private var nodes: [Key: Node] = [:]
+    private var oldest: Node?
+    private var newest: Node?
     private var repeatDropped = false
 
     init(capacity: Int = ReportedBids.defaultCapacity) {
@@ -42,16 +57,45 @@ final class ReportedBids {
     func markReported(_ resolvedBidId: String, for opaqueUserId: String) -> Bool {
         let key = Key(opaqueUserId: opaqueUserId, resolvedBidId: resolvedBidId)
         return lock.withLock {
-            if let index = reported.firstIndex(of: key) {
-                reported.remove(at: index)
-                reported.append(key)
+            if let node = nodes[key] {
+                unlink(node)
+                append(node)
                 return false
             }
-            reported.append(key)
-            if reported.count > capacity {
-                reported.removeFirst()
+            let node = Node(key)
+            nodes[key] = node
+            append(node)
+            if nodes.count > capacity, let evicted = oldest {
+                unlink(evicted)
+                nodes[evicted.key] = nil
             }
             return true
+        }
+    }
+
+    /// Must hold `lock`.
+    private func unlink(_ node: Node) {
+        if let older = node.older {
+            older.newer = node.newer
+        } else {
+            oldest = node.newer
+        }
+        if let newer = node.newer {
+            newer.older = node.older
+        } else {
+            newest = node.older
+        }
+        node.older = nil
+        node.newer = nil
+    }
+
+    /// Must hold `lock`.
+    private func append(_ node: Node) {
+        node.older = newest
+        newest?.newer = node
+        newest = node
+        if oldest == nil {
+            oldest = node
         }
     }
 
@@ -68,7 +112,9 @@ final class ReportedBids {
     /// Only tests call this, to start each one without the bids earlier tests reported.
     func clear() {
         lock.withLock {
-            reported.removeAll()
+            nodes.removeAll()
+            oldest = nil
+            newest = nil
             repeatDropped = false
         }
     }

@@ -53,6 +53,56 @@ class ReportedBidsTests: XCTestCase {
         XCTAssertTrue(bids.markReported("b", for: "user-1"), "b was the least recent, so c evicted it")
     }
 
+    func testAtTheRealCapacityARepeatedBidOutlivesNewerOnes() {
+        let bids = ReportedBids()
+        _ = bids.markReported("kept", for: "user-1")
+        _ = bids.markReported("evicted", for: "user-1")
+        for i in 0 ..< ReportedBids.defaultCapacity - 2 {
+            _ = bids.markReported("filler-\(i)", for: "user-1")
+        }
+        XCTAssertFalse(bids.markReported("kept", for: "user-1"), "full, nothing evicted yet")
+        _ = bids.markReported("one-past-capacity", for: "user-1")
+        XCTAssertFalse(bids.markReported("kept", for: "user-1"), "the repeat made kept recent")
+        XCTAssertTrue(bids.markReported("evicted", for: "user-1"), "the least recent went first")
+    }
+
+    func testClearThenReportStartsAFreshOrder() {
+        let bids = ReportedBids(capacity: 2)
+        _ = bids.markReported("a", for: "user-1")
+        _ = bids.markReported("b", for: "user-1")
+        bids.clear()
+        XCTAssertTrue(bids.markReported("c", for: "user-1"))
+        XCTAssertTrue(bids.markReported("d", for: "user-1"))
+        XCTAssertFalse(bids.markReported("c", for: "user-1"))
+        XCTAssertTrue(bids.markReported("e", for: "user-1"), "evicts d, the least recent")
+        XCTAssertTrue(bids.markReported("d", for: "user-1"))
+    }
+
+    /// Random reports checked against a plain array kept in recency order, the obvious LRU, so
+    /// every unlink and relink path of the list is exercised, including capacity 1.
+    func testMatchesAnArrayLRUOnRandomReports() {
+        var rng = SystemRandomNumberGenerator()
+        for capacity in [1, 2, 3, 8] {
+            let bids = ReportedBids(capacity: capacity)
+            var model: [String] = []
+            for step in 0 ..< 5000 {
+                let bid = "bid-\(Int.random(in: 0 ..< capacity * 2 + 1, using: &rng))"
+                let expected: Bool
+                if let index = model.firstIndex(of: bid) {
+                    model.remove(at: index)
+                    expected = false
+                } else {
+                    expected = true
+                }
+                model.append(bid)
+                if model.count > capacity {
+                    model.removeFirst()
+                }
+                XCTAssertEqual(bids.markReported(bid, for: "user-1"), expected, "capacity \(capacity), step \(step), \(bid)")
+            }
+        }
+    }
+
     func testConcurrentReportsOfOneBidLetExactlyOneThrough() {
         let bids = ReportedBids()
         let lock = NSLock()
