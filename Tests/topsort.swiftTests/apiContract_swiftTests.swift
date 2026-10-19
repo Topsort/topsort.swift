@@ -380,6 +380,13 @@ class APIContractEventTests: XCTestCase {
         )
     }
 
+    /// Public types get no inferred Sendable, and an app in Swift 6 mode captures the checkpoint
+    /// in a player callback; this fails to compile if the conformance is dropped.
+    func testVideoCheckpointIsSendable() {
+        func requireSendable<T: Sendable>(_: T.Type) {}
+        requireSendable(VideoCheckpoint.self)
+    }
+
     func testVideoCheckpointEventEncoding() throws {
         let video = VideoEvent(
             resolvedBidId: "bid-abc",
