@@ -285,6 +285,16 @@ class EventModelTests: XCTestCase {
     // MARK: - Spec enums
 
     /// The raw values are what goes on the wire; they must be the API's enum values exactly.
+    /// Public types get no inferred Sendable; apps in Swift 6 mode need it to keep these values in
+    /// actor state or pass them to a Task. Fails to compile if a conformance is dropped.
+    func testSpecEnumsAreSendable() {
+        func requireSendable<T: Sendable>(_: T.Type) {}
+        requireSendable(DeviceType.self)
+        requireSendable(Channel.self)
+        requireSendable(ClickType.self)
+        requireSendable(PageType.self)
+    }
+
     func testSpecEnumRawValuesMatchTheAPI() {
         XCTAssertEqual([DeviceType.desktop, .mobile].map(\.rawValue), ["desktop", "mobile"])
         XCTAssertEqual([Channel.onsite, .offsite, .instore].map(\.rawValue), ["onsite", "offsite", "instore"])

@@ -10,27 +10,27 @@ public enum EntityType: String, Codable {
 }
 
 /// The device the user is on.
-public enum DeviceType: String, Codable {
+public enum DeviceType: String, Codable, Sendable {
     case desktop
     case mobile
 }
 
 /// Where the event occurred.
-public enum Channel: String, Codable {
+public enum Channel: String, Codable, Sendable {
     case onsite
     case offsite
     case instore
 }
 
 /// The specific flavor of a click on a sponsored listing.
-public enum ClickType: String, Codable {
+public enum ClickType: String, Codable, Sendable {
     case product
     case like
     case addToCart = "add-to-cart"
 }
 
 /// The type of page an event or auction occurred on.
-public enum PageType: String, Codable {
+public enum PageType: String, Codable, Sendable {
     case home
     case category
     /// Product detail page.
