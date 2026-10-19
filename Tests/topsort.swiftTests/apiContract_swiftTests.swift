@@ -9,7 +9,7 @@ class APIContractAuctionTests: XCTestCase {
 
     func testListingsAuctionMatchesAPIFormat() throws {
         let products = try AuctionProducts(ids: ["p_PJbnN", "p_ojng4"])
-        let auction = Auction(type: "listings", slots: 2, device: "mobile", products: products)
+        let auction = Auction(type: "listings", slots: 2, device: .mobile, products: products)
 
         let payload = ["auctions": [auction]]
         let data = try JSONEncoder().encode(payload)
@@ -24,7 +24,7 @@ class APIContractAuctionTests: XCTestCase {
 
     func testBannerAuctionMatchesAPIFormat() throws {
         let category = AuctionCategory(id: "shoes")
-        let auction = Auction(type: "banners", slots: 1, slotId: "home-banner", device: "desktop", category: category)
+        let auction = Auction(type: "banners", slots: 1, slotId: "home-banner", device: .desktop, category: category)
 
         let data = try JSONEncoder().encode(auction)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -165,7 +165,7 @@ class APIContractEventTests: XCTestCase {
         XCTAssertEqual(try idField(Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now, id: id)), id)
         XCTAssertEqual(try idField(Event(resolvedBidId: "bid", occurredAt: Date.now, id: id)), id)
         XCTAssertEqual(try idField(PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 1)], occurredAt: Date.now, id: id)), id)
-        XCTAssertEqual(try idField(PageViewEvent(page: Page(type: "home", pageId: "home"), occurredAt: Date.now, id: id)), id)
+        XCTAssertEqual(try idField(PageViewEvent(page: Page(type: .home, pageId: "home"), occurredAt: Date.now, id: id)), id)
         XCTAssertEqual(try idField(RenderEvent(resolvedBidId: "bid", occurredAt: Date.now, id: id)), id)
         XCTAssertEqual(try idField(VideoEvent(resolvedBidId: "bid", checkpoint: .start, occurredAt: Date.now, id: id)), id)
         XCTAssertNotNil(UUID(uuidString: Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now).id), "the default must still mint a fresh UUID")
@@ -183,8 +183,8 @@ class APIContractEventTests: XCTestCase {
             resolvedBidId: "bid-abc",
             occurredAt: Date.now,
             opaqueUserId: "user-123",
-            deviceType: "mobile",
-            channel: "onsite"
+            deviceType: .mobile,
+            channel: .onsite
         )
 
         let data = try JSONEncoder().encode(event)
@@ -200,7 +200,7 @@ class APIContractEventTests: XCTestCase {
             resolvedBidId: "bid-abc",
             occurredAt: Date.now,
             opaqueUserId: "user-123",
-            clickType: "add-to-cart"
+            clickType: .addToCart
         )
 
         let data = try JSONEncoder().encode(event)
@@ -245,8 +245,8 @@ class APIContractEventTests: XCTestCase {
             items: [item],
             occurredAt: Date.now,
             opaqueUserId: "user-123",
-            deviceType: "desktop",
-            channel: "offsite"
+            deviceType: .desktop,
+            channel: .offsite
         )
 
         let data = try JSONEncoder().encode(purchase)
@@ -262,13 +262,13 @@ class APIContractEventTests: XCTestCase {
     // MARK: - PageView event
 
     func testPageViewEventEncoding() throws {
-        let page = Page(type: "category", pageId: "cat-shoes", value: "Shoes")
+        let page = Page(type: .category, pageId: "cat-shoes", value: "Shoes")
         let pageview = PageViewEvent(
             page: page,
             occurredAt: Date.now,
             opaqueUserId: "user-123",
-            deviceType: "mobile",
-            channel: "onsite"
+            deviceType: .mobile,
+            channel: .onsite
         )
 
         let data = try JSONEncoder().encode(pageview)
@@ -288,7 +288,7 @@ class APIContractEventTests: XCTestCase {
     // MARK: - Events batch with pageviews
 
     func testEventsBatchIncludesPageviews() throws {
-        let page = Page(type: "home", pageId: "home-1")
+        let page = Page(type: .home, pageId: "home-1")
         let pageview = PageViewEvent(page: page, occurredAt: Date.now)
         let events = Events(pageviews: [pageview])
 
@@ -302,7 +302,7 @@ class APIContractEventTests: XCTestCase {
 
     func testEventItemGroupsPageviews() {
         Topsort.shared.set(opaqueUserId: "test-user")
-        let page = Page(type: "search", pageId: "search-1", value: "shoes")
+        let page = Page(type: .search, pageId: "search-1", value: "shoes")
         let pageview = PageViewEvent(page: page, occurredAt: Date.now)
         let impression = Event(entity: Entity(type: .product, id: "p1"), occurredAt: Date.now)
 
@@ -324,8 +324,8 @@ class APIContractEventTests: XCTestCase {
             resolvedBidId: "bid-abc",
             occurredAt: Date.now,
             opaqueUserId: "user-123",
-            deviceType: "mobile",
-            channel: "onsite"
+            deviceType: .mobile,
+            channel: .onsite
         )
 
         let data = try JSONEncoder().encode(render)
@@ -387,8 +387,8 @@ class APIContractEventTests: XCTestCase {
             occurredAt: Date.now,
             opaqueUserId: "user-123",
             placement: Placement(path: "/categories/dairy", position: 1),
-            deviceType: "mobile",
-            channel: "onsite"
+            deviceType: .mobile,
+            channel: .onsite
         )
 
         let data = try JSONEncoder().encode(video)

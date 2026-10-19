@@ -235,6 +235,28 @@ class TopsortRepeatReportTests: XCTestCase {
         XCTAssertEqual(count(.impression, in: queued()), 1)
     }
 
+    /// An event the API would reject is dropped and never sent, so it must not use up its bid: the
+    /// corrected report that follows is the first real one.
+    func testAnInvalidReportDoesNotUseUpItsBid() {
+        let invalid = Event(resolvedBidId: "bid-1", occurredAt: Date.now, opaqueUserId: "user-1", placement: Placement(path: "/home", position: 0))
+        Topsort.shared.track(impression: invalid)
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        Topsort.shared.track(render: RenderEvent(resolvedBidId: "bid-1", occurredAt: Date.now, opaqueUserId: "user-1", id: ""))
+        Topsort.shared.track(render: render(bid: "bid-1"))
+        let items = queued()
+        XCTAssertEqual(count(.impression, in: items), 1)
+        XCTAssertEqual(count(.render, in: items), 1)
+        XCTAssertNil(items.first { $0.specViolation != nil }, "only the valid reports are queued")
+    }
+
+    /// An invalid repeat must not free a bid a valid report already used.
+    func testAnInvalidRepeatDoesNotFreeItsBid() {
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        Topsort.shared.track(impression: Event(resolvedBidId: "bid-1", occurredAt: Date.now, opaqueUserId: "user-1", id: ""))
+        Topsort.shared.track(impression: impression(bid: "bid-1"))
+        XCTAssertEqual(count(.impression, in: queued()), 1)
+    }
+
     /// A shared device or kiosk passes each user's id on the event and never changes the
     /// facade's: each user's report of the bid is their own.
     func testEachUsersReportOfTheSameBidIsSent() {

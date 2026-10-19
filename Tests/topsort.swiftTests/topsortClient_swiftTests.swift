@@ -26,7 +26,7 @@ class TopsortClientTests: XCTestCase {
             """.utf8)
             return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, body)
         }
-        let response = try await client.auctions([Auction(type: "listings", slots: 1, device: "mobile", products: AuctionProducts(ids: ["p1"]))])
+        let response = try await client.auctions([Auction(type: "listings", slots: 1, device: .mobile, products: AuctionProducts(ids: ["p1"]))])
         XCTAssertEqual(seen?.url?.absoluteString, "https://proxy.example.com/v2/auctions")
         XCTAssertEqual(seen?.value(forHTTPHeaderField: "Authorization"), "Bearer test-key")
         XCTAssertEqual(response.results.first?.winners.first?.resolvedBidId, "bid-1")
@@ -102,6 +102,31 @@ class TopsortClientTests: XCTestCase {
             return try XCTUnwrap(json["videoEvents"] as? [[String: Any]]).count
         }
         XCTAssertEqual(sizes, [50, 1])
+    }
+
+    /// One invalid event must not get the whole request rejected: it is dropped, the rest go out.
+    func testSendDropsInvalidEventsAndSendsTheRest() async throws {
+        var bodies: [Data] = []
+        MockURLProtocol.requestHandler = { request in
+            let stream = request.httpBodyStream!
+            stream.open()
+            var buffer = [UInt8](repeating: 0, count: 16384)
+            let read = stream.read(&buffer, maxLength: buffer.count)
+            bodies.append(Data(buffer[0 ..< max(read, 0)]))
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
+        }
+        let good = Event(resolvedBidId: "bid-ok", occurredAt: Date.now, opaqueUserId: "u1")
+        let bad = Event(resolvedBidId: "bid-bad", occurredAt: Date.now, opaqueUserId: "u1", id: "")
+        try await client.send(clicks: [good, bad])
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(bodies.first)) as? [String: Any])
+        let clicks = try XCTUnwrap(json["clicks"] as? [[String: Any]])
+        XCTAssertEqual(clicks.map { $0["resolvedBidId"] as? String }, ["bid-ok"])
+    }
+
+    func testSendWithOnlyInvalidEventsDoesNotPost() async throws {
+        MockURLProtocol.requestHandler = { _ in XCTFail("must not send"); throw URLError(.badURL) }
+        try await client.send(clicks: [Event(resolvedBidId: "bid", occurredAt: Date.now, opaqueUserId: "u1", id: "")])
     }
 
     func testSendWithNothingToSendDoesNotPost() async throws {

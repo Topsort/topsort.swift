@@ -107,8 +107,10 @@ public class Topsort: TopsortProtocol {
             Logger.warning("track(impression:) called before configure(). Event dropped.")
             return
         }
-        // Organic impressions carry no bid and legitimately repeat as a product reappears.
-        if let bidId = event.resolvedBidId, !reportedImpressionBids.markReported(bidId, for: event.opaqueUserId) {
+        // Organic impressions carry no bid and legitimately repeat as a product reappears. An
+        // invalid event is dropped by push and must not use up its bid, or a corrected report of
+        // it would be dropped as a repeat.
+        if let bidId = event.resolvedBidId, event.specViolation == nil, !reportedImpressionBids.markReported(bidId, for: event.opaqueUserId) {
             logRepeat("Dropping a repeat impression for resolvedBidId \(bidId). A resolved bid earns one impression; report it once, when the ad is shown, not every time its view appears.", in: reportedImpressionBids)
             return
         }
@@ -144,7 +146,7 @@ public class Topsort: TopsortProtocol {
             Logger.warning("track(render:) called before configure(). Event dropped.")
             return
         }
-        if !reportedRenderBids.markReported(event.resolvedBidId, for: event.opaqueUserId) {
+        if event.specViolation == nil, !reportedRenderBids.markReported(event.resolvedBidId, for: event.opaqueUserId) {
             logRepeat("Dropping a repeat render for resolvedBidId \(event.resolvedBidId). A resolved bid earns one render; report it once, when the ad enters the view, not every time its view appears.", in: reportedRenderBids)
             return
         }

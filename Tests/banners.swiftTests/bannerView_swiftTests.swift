@@ -10,7 +10,7 @@ class TopsortBannerTests: XCTestCase {
         let expectation = self.expectation(description: "Button clicked action")
         let banner = TopsortBanner(bannerAuctionBuilder: .init(
             slotId: "test_slot_id",
-            deviceType: "test_device_type"
+            deviceType: .mobile
         )).buttonClickedAction { _ in
             expectation.fulfill()
         }
@@ -35,7 +35,7 @@ class TopsortBannerTests: XCTestCase {
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
-            deviceType: "test_device_type"
+            deviceType: .mobile
         ).build()
 
         let vm = await TopsortBanner.ViewModel()
@@ -62,7 +62,7 @@ class TopsortBannerTests: XCTestCase {
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
-            deviceType: "test_device_type"
+            deviceType: .mobile
         ).build()
 
         let vm = await TopsortBanner.ViewModel()
@@ -88,7 +88,7 @@ class TopsortBannerTests: XCTestCase {
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
-            deviceType: "test_device_type"
+            deviceType: .mobile
         ).build()
 
         let vm = await TopsortBanner.ViewModel()
@@ -109,7 +109,7 @@ class TopsortBannerTests: XCTestCase {
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
-            deviceType: "test_device_type"
+            deviceType: .mobile
         ).build()
 
         var noWinnersCalled = false
@@ -131,7 +131,7 @@ class TopsortBannerTests: XCTestCase {
 
         let auction = BannerAuctionBuilder(
             slotId: "test_slot_id",
-            deviceType: "test_device_type"
+            deviceType: .mobile
         ).build()
 
         var errorReceived: BannerError?
@@ -144,12 +144,12 @@ class TopsortBannerTests: XCTestCase {
     // MARK: - BannerAuctionBuilder
 
     func testBannerAuctionBuilderBuild() {
-        let builder = BannerAuctionBuilder(slotId: "home", deviceType: "mobile")
+        let builder = BannerAuctionBuilder(slotId: "home", deviceType: .mobile)
         let auction = builder.build()
         XCTAssertEqual(auction.type, "banners")
         XCTAssertEqual(auction.slots, 1)
         XCTAssertEqual(auction.slotId, "home")
-        XCTAssertEqual(auction.device, "mobile")
+        XCTAssertEqual(auction.device, .mobile)
         XCTAssertNil(auction.products)
         XCTAssertNil(auction.category)
         XCTAssertNil(auction.searchQuery)
@@ -159,7 +159,7 @@ class TopsortBannerTests: XCTestCase {
     /// The auction must carry the same opaqueUserId the events will, or the banner's
     /// impressions and clicks cannot be joined to the auction that produced them.
     func testBannerAuctionBuilderCarriesOpaqueUserId() {
-        let builder = BannerAuctionBuilder(slotId: "home", deviceType: "mobile")
+        let builder = BannerAuctionBuilder(slotId: "home", deviceType: .mobile)
         XCTAssertEqual(builder.build(opaqueUserId: "u1").opaqueUserId, "u1")
         XCTAssertEqual(builder.build().opaqueUserId, Topsort.shared.opaqueUserId)
 
@@ -169,7 +169,7 @@ class TopsortBannerTests: XCTestCase {
 
     func testBannerAuctionBuilderWithProducts() throws {
         let products = try AuctionProducts(ids: ["p1", "p2"])
-        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: "desktop")
+        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: .desktop)
             .with(products: products)
         let auction = builder.build()
         XCTAssertEqual(auction.products?.ids, ["p1", "p2"])
@@ -177,14 +177,14 @@ class TopsortBannerTests: XCTestCase {
 
     func testBannerAuctionBuilderWithCategory() {
         let category = AuctionCategory(id: "c1")
-        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile")
+        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: .mobile)
             .with(category: category)
         let auction = builder.build()
         XCTAssertEqual(auction.category?.id, "c1")
     }
 
     func testBannerAuctionBuilderWithSearchQuery() {
-        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile")
+        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: .mobile)
             .with(searchQuery: "shoes")
         let auction = builder.build()
         XCTAssertEqual(auction.searchQuery, "shoes")
@@ -192,7 +192,7 @@ class TopsortBannerTests: XCTestCase {
 
     func testBannerAuctionBuilderWithGeoTargeting() {
         let geo = AuctionGeoTargeting(location: "US")
-        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile")
+        let builder = BannerAuctionBuilder(slotId: "s1", deviceType: .mobile)
             .with(geoTargeting: geo)
         let auction = builder.build()
         XCTAssertEqual(auction.geoTargeting?.location, "US")
@@ -211,7 +211,7 @@ class TopsortBannerTests: XCTestCase {
         try Topsort.shared.configure(config)
 
         let vm = await TopsortBanner.ViewModel()
-        let auction = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile").build()
+        let auction = BannerAuctionBuilder(slotId: "s1", deviceType: .mobile).build()
         await vm.executeAuctions(auction: auction, topsort: mockTopsort, onError: nil, onNoWinners: nil)
 
         await MainActor.run {
@@ -229,7 +229,7 @@ class TopsortBannerTests: XCTestCase {
         try Topsort.shared.configure(config)
 
         let vm = await TopsortBanner.ViewModel()
-        let auction = BannerAuctionBuilder(slotId: "s1", deviceType: "mobile").build()
+        let auction = BannerAuctionBuilder(slotId: "s1", deviceType: .mobile).build()
         await vm.executeAuctions(auction: auction, topsort: mockTopsort, onError: nil, onNoWinners: nil)
 
         await MainActor.run {

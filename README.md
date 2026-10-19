@@ -86,8 +86,8 @@ let products = try AuctionProducts(ids: ["p_dsad", "p_dvra", "p_oplf", "p_gjfo"]
 let category = AuctionCategory(id: "c_fdfa")
 
 let auctions = [
-    Auction(type: "banners", slots: 1, slotId: "home-banner", device: "mobile", category: category),
-    Auction(type: "listings", slots: 2, device: "mobile", products: products),
+    Auction(type: "banners", slots: 1, slotId: "home-banner", device: .mobile, category: category),
+    Auction(type: "listings", slots: 2, device: .mobile, products: products),
 ]
 
 let response = try await Topsort.shared.executeAuctions(auctions: auctions)
@@ -127,7 +127,7 @@ Topsort.shared.track(impression: event)  // on view appear
 Topsort.shared.track(click: event)       // on tap
 ```
 
-Report each impression once per `resolvedBidId`, when the creative is on screen. Both initializers also take optional context: `placement`, `page`, `deviceType`, `channel`, `additionalAttribution` (a product or vendor `Entity` to attribute purchases to besides the ad's own; only meaningful with `resolvedBidId`) and, for clicks, `clickType` (`"product"`, `"like"`, `"add-to-cart"`).
+Report each impression once per `resolvedBidId`, when the creative is on screen. Both initializers also take optional context: `placement`, `page`, `deviceType` (`DeviceType`: `.desktop`, `.mobile`), `channel` (`Channel`: `.onsite`, `.offsite`, `.instore`), `additionalAttribution` (a product or vendor `Entity` to attribute purchases to besides the ad's own; only meaningful with `resolvedBidId`) and, for clicks, `clickType` (`ClickType`: `.product`, `.like`, `.addToCart`).
 
 `Topsort.shared` enforces the once-per-bid rule for impressions and renders: it sends the first report of each `resolvedBidId` for each `opaqueUserId` and drops any later one in the same process, logging a warning the first time. That includes showing the same winner again, from a cached auction response, in a second placement or after navigating back: only the first report is sent. If the first report could not be delivered (the queue gave up on it), the next one is sent. Organic impressions and clicks are never dropped, and `TopsortClient` sends everything it is given.
 
@@ -246,7 +246,7 @@ Topsort.shared.track(purchase: purchase)
 #### Page Views
 
 ```swift
-let pageview = PageViewEvent(page: Page(type: "category", pageId: "shoes"), occurredAt: Date.now)
+let pageview = PageViewEvent(page: Page(type: .category, pageId: "shoes"), occurredAt: Date.now)
 Topsort.shared.track(pageview: pageview)
 ```
 
@@ -267,7 +267,7 @@ Drop-in banner component that handles the full lifecycle: auction, image loading
 ```swift
 import TopsortBanners
 
-TopsortBanner(bannerAuctionBuilder: .init(slotId: "home-banner", deviceType: "mobile"))
+TopsortBanner(bannerAuctionBuilder: .init(slotId: "home-banner", deviceType: .mobile))
     .contentMode(.fill)
     .onNoWinners {
         // No ads available for this placement
@@ -338,13 +338,13 @@ Topsort (core)              TopsortBanners (UI)
 
 ## How Events Are Delivered
 
-A `track` call appends the event to an in-memory queue and returns; nothing happens on the caller's thread. The queue is sent when it reaches `flushAt`, every `flushInterval`, on `flush()`, when the app goes to the background or terminates, and when connectivity returns. Sends are retried with exponential backoff, across being offline and across launches: both are written atomically to `Application Support` — the queue debounced 5 s (and synchronously on background/terminate), the set of unacknowledged batches on every change, because that set is what decides whether a batch is re-sent after a crash. Events are never dropped for being old; the only drops are the ones [Error Handling](#error-handling) describes.
+A `track` call appends the event to an in-memory queue and returns; nothing happens on the caller's thread. The queue is sent when it reaches `flushAt`, every `flushInterval`, on `flush()`, when the app goes to the background or terminates, and when connectivity returns. Sends are retried with exponential backoff, across being offline and across launches: both are written atomically to `Application Support` — the queue debounced 5 s (and synchronously on background/terminate), the set of unacknowledged batches on every change, because that set is what decides whether a batch is re-sent after a crash. Events are never dropped for being old; the only drops are the ones [Error Handling](#error-handling) describes. A queued event that a newer SDK version can no longer read is skipped when the queue loads, without losing the rest of the queue.
 
 ## Error Handling
 
 `configure()` throws `ConfigurationError` for an invalid `url`, `flushAt < 1` or `flushInterval <= 0`; until it succeeds, `track()` logs and drops the event and `executeAuctions()` throws `AuctionError.notConfigured`.
 
-Events the SDK gives up on are logged and dropped, and reported to `Configuration.onEventsDiscarded` with a `DiscardReason` and a count if you set it (queue eviction is logged at `.warning`, once per episode; the rest at `.error`): rejected by the API with a 4xx (408 and 429 are retried instead), retried 50 times without success, evicted as the oldest once the queue passes 5,000 events, or impossible to serialize (a non-finite `unitPrice`, say — only the offending event is dropped, not its batch).
+Events the SDK gives up on are logged and dropped, and reported to `Configuration.onEventsDiscarded` with a `DiscardReason` and a count if you set it (queue eviction is logged at `.warning`, once per episode; the rest at `.error`): rejected by the API with a 4xx (408 and 429 are retried instead), retried 50 times without success, evicted as the oldest once the queue passes 5,000 events, impossible to serialize (a non-finite `unitPrice`, say — only the offending event is dropped, not its batch), or `invalid`: breaking a rule of the events API that the types cannot express (an empty `id`, an empty `placement.path`, a `placement.position`, `page` or `pageSize` below 1, an empty `productId`, `categoryIds` or `searchQuery`, an empty array `Page` value). The API rejects a whole request over one such event, so `track` drops it on arrival, at `.warning`, before it can join a batch, and queued events restored from disk are checked again before sending. `TopsortClient.send` drops it the same way, with a warning, and sends the rest.
 
 `executeAuctions()` throws `AuctionError`:
 
@@ -396,6 +396,20 @@ let banner = TopsortBanner(bannerAuctionBuilder: builder, topsort: StubTopsort(r
 The `Topsort` library ships a `PrivacyInfo.xcprivacy` resource declaring what it sends to Topsort: a user identifier (`opaqueUserId`, a random UUID the SDK generates unless you call `set(opaqueUserId:)`), purchase history (`track(purchase:)`), product interaction (renders, impressions, clicks, page views, video events), and search history (`searchQuery` on auctions and placements). All four are declared as linked to the user, not used for tracking, with purposes *Analytics*, *Developer's Advertising or Marketing* and *Third-Party Advertising* — the ads are the marketplace's vendors', served by Topsort. It accesses no required-reason APIs and lists no tracking domains.
 
 Xcode merges this into your app's privacy report, but App Store Connect's questionnaire is answered from your own manifest: declare the same data types there, and only mark them as tracking if you pass an identifier that is used across apps or sites. Purchase history does not apply if you never call `track(purchase:)`, nor search history if you never pass `searchQuery`. `AuctionGeoTargeting.location` is a free-form string the SDK does not classify: if you derive it from the user's location, declare *Coarse Location* yourself.
+
+## Upgrading from 1.x
+
+2.0 types the fields the events and auctions API restrict to a fixed set of values, so a value the API would reject no longer compiles:
+
+| 1.x | 2.0 |
+|---|---|
+| `deviceType: "mobile"` (events, `BannerAuctionBuilder`) | `deviceType: .mobile` (`DeviceType`) |
+| `device: "desktop"` (`Auction`) | `device: .desktop` (`DeviceType`) |
+| `channel: "onsite"` | `channel: .onsite` (`Channel`) |
+| `clickType: "add-to-cart"` | `clickType: .addToCart` (`ClickType`) |
+| `Page(type: "category", ...)` | `Page(type: .category, ...)` (`PageType`; `"PDP"` is `.pdp`) |
+
+If you pass these from a server-driven string, map it with `DeviceType(rawValue:)`, `Channel(rawValue:)`, `ClickType(rawValue:)` or `PageType(rawValue:)`, which return nil for a value the API does not accept. Events already queued on the device when the app updates are kept; any carrying a value 2.0 no longer reads are skipped.
 
 ## Requirements
 
