@@ -145,6 +145,65 @@ Topsort.shared.track(video: failure)
 
 Video events report playback checkpoints and delivery failures of a sponsored video ad, using the IAB VAST tracking-event names, so a player's existing VAST trackers map one to one. They are sponsored-only (`resolvedBidId` is required and must come from a video campaign; the API rejects any other bid) and feed engagement and delivery reporting only: they are never charged or attributed. Report each checkpoint once per `resolvedBidId`. The API requires an `errorCode` on every `error` event, which is why failures have their own initializer. Both initializers take the same optional `placement`, `page`, `deviceType` and `channel` as renders.
 
+`AVPlayer` raises none of these itself: the app reports each checkpoint from the player's own observers. A boundary time observer per checkpoint covers `start` and the quartiles, `AVPlayerItemDidPlayToEndTime` covers `complete`, and `AVPlayerItemFailedToPlayToEndTime` covers `error`. A seek past a quartile skips it, which matches VAST. For example:
+
+```swift
+import AVFoundation
+import Topsort
+
+/// Reports one sponsored video ad's VAST checkpoints from an AVPlayer.
+final class VideoAdReporter {
+    private let player: AVPlayer
+    private let resolvedBidId: String
+    private var timeObservers: [Any] = []
+    private var notificationObservers: [NSObjectProtocol] = []
+
+    init(player: AVPlayer, resolvedBidId: String) {
+        self.player = player
+        self.resolvedBidId = resolvedBidId
+    }
+
+    /// Call once the item is ready to play, so its duration is known.
+    func start() {
+        guard let item = player.currentItem, item.duration.isNumeric else { return }
+        let checkpoints: [(VideoCheckpoint, Float64)] = [(.start, 0.001), (.firstQuartile, 0.25), (.midpoint, 0.5), (.thirdQuartile, 0.75)]
+        for (checkpoint, fraction) in checkpoints {
+            let time = NSValue(time: CMTimeMultiplyByFloat64(item.duration, multiplier: fraction))
+            timeObservers.append(player.addBoundaryTimeObserver(forTimes: [time], queue: .main) { [weak self] in
+                self?.report(VideoEvent(resolvedBidId: self?.resolvedBidId ?? "", checkpoint: checkpoint, occurredAt: Date.now))
+            })
+        }
+        let center = NotificationCenter.default
+        notificationObservers.append(center.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            report(VideoEvent(resolvedBidId: resolvedBidId, checkpoint: .complete, occurredAt: Date.now))
+            stop()
+        })
+        notificationObservers.append(center.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            // AVFoundation reports an NSError: send the closest VAST code, never the NSError's own code.
+            report(VideoEvent(resolvedBidId: resolvedBidId, errorCode: 405, occurredAt: Date.now))
+            stop()
+        })
+    }
+
+    /// Removes the observers, so a replay or a seek back does not report a checkpoint twice.
+    func stop() {
+        timeObservers.forEach(player.removeTimeObserver)
+        timeObservers = []
+        notificationObservers.forEach(NotificationCenter.default.removeObserver)
+        notificationObservers = []
+    }
+
+    private func report(_ event: VideoEvent) {
+        Topsort.shared.track(video: event)
+    }
+}
+
+```
+
+`errorCode` must be a [VAST error code](https://iabtechlab.com/standards/vast/), not the `NSError` code AVFoundation reports: map the failure to the closest one, such as `401` (file not found), `402` (timeout) or `405` (the media file could not be played). The API accepts any integer, so passing the `NSError` code through is silently wrong in reporting. An item that never becomes ready (`AVPlayerItem.status == .failed`) is an `error` too. Players that speak VAST, such as Google's IMA SDK, already raise these event names and codes, so their callbacks map one to one.
+
 #### Purchases
 
 ```swift

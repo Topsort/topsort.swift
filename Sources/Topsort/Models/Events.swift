@@ -321,7 +321,7 @@ public struct RenderEvent: Codable {
 }
 
 /// A VAST playback checkpoint reached by a sponsored video ad.
-public enum VideoCheckpoint: String, Codable {
+public enum VideoCheckpoint: String, Codable, Sendable {
     /// Playback started.
     case start
     /// Playback reached 25% of the video's duration.
