@@ -10,6 +10,7 @@ public protocol TopsortProtocol {
     func track(purchase event: PurchaseEvent)
     func track(pageview event: PageViewEvent)
     func track(render event: RenderEvent)
+    func track(video event: VideoEvent)
     func flush()
     func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse
 }
@@ -18,6 +19,7 @@ public protocol TopsortProtocol {
 public extension TopsortProtocol {
     func track(pageview _: PageViewEvent) {}
     func track(render _: RenderEvent) {}
+    func track(video _: VideoEvent) {}
 }
 
 public class Topsort: TopsortProtocol {
@@ -149,6 +151,14 @@ public class Topsort: TopsortProtocol {
         EventManager.shared.push(event: .render(event))
     }
 
+    public func track(video event: VideoEvent) {
+        guard isConfigured else {
+            Logger.warning("track(video:) called before configure(). Event dropped.")
+            return
+        }
+        EventManager.shared.push(event: .video(event))
+    }
+
     /// Called by `EventManager` with the events it gave up on. The API never accepted their
     /// impressions and renders, so the next report of each bid for its user must be sent, not dropped.
     func forgetReports(in items: [EventItem]) {
@@ -160,7 +170,7 @@ public class Topsort: TopsortProtocol {
                 }
             case let .render(event):
                 reportedRenderBids.unmark(event.resolvedBidId, for: event.opaqueUserId)
-            case .click, .purchase, .pageview:
+            case .click, .purchase, .pageview, .video:
                 break
             }
         }

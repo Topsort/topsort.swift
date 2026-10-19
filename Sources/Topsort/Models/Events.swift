@@ -293,6 +293,133 @@ public struct RenderEvent: Codable {
     }
 }
 
+/// A VAST playback checkpoint reached by a sponsored video ad.
+public enum VideoCheckpoint: String, Codable, Sendable {
+    /// Playback started.
+    case start
+    /// Playback reached 25% of the video's duration.
+    case firstQuartile
+    /// Playback reached 50% of the video's duration.
+    case midpoint
+    /// Playback reached 75% of the video's duration.
+    case thirdQuartile
+    /// Playback reached the end of the video.
+    case complete
+}
+
+/// A video event reports that a sponsored video ad reached a playback checkpoint or failed to play.
+/// Event names follow the IAB VAST tracking-event vocabulary. Video events are sponsored-only, so
+/// `resolvedBidId` is required and must come from a video campaign (the API rejects any other bid).
+/// They feed engagement and delivery reporting only and are never charged or attributed.
+public struct VideoEvent: Codable {
+    /**
+     The `resolvedBidId` field received from the `/auctions` request for a video ad.
+     */
+    let resolvedBidId: String
+
+    /**
+     One of `start`, `firstQuartile`, `midpoint`, `thirdQuartile`, `complete` or `error`. Set by the
+     initializer: a `VideoCheckpoint` for playback, `error` when built with an `errorCode`.
+     */
+    let eventType: String
+
+    /**
+     VAST error code describing why the video failed (e.g. `405`). Present only when `eventType` is `error`,
+     where the API requires it. `Int32` because the API takes any int32: a wider value would fail to decode
+     server side and reject the whole request.
+     */
+    let errorCode: Int32?
+
+    /**
+     RFC3339 formatted timestamp including UTC offset.
+     */
+    @TSDateValue
+    var occurredAt: Date
+
+    /**
+     The opaque user ID allows correlating user activity, such as Video events, Impressions, Clicks and Purchases, whether or not they
+     are actually logged in. It must be long lived (at least a year) so that Topsort can attribute purchases.
+     */
+    let opaqueUserId: String
+
+    /**
+     The marketplace's unique ID for the video event. This field ensures the event reporting is idempotent in case there is
+     a network issue and the request is retried.
+     */
+    let id: String
+
+    let placement: Placement?
+
+    /// Page context for the event.
+    let page: Page?
+
+    /// Device type: "desktop" or "mobile".
+    let deviceType: String?
+
+    /// Channel: "onsite", "offsite", or "instore".
+    let channel: String?
+
+    /// Reports that playback reached `checkpoint`.
+    public init(
+        resolvedBidId: String,
+        checkpoint: VideoCheckpoint,
+        occurredAt: Date,
+        opaqueUserId: String = Topsort.shared.opaqueUserId,
+        placement: Placement? = nil,
+        page: Page? = nil,
+        deviceType: String? = nil,
+        channel: String? = nil,
+        id: String = UUID().uuidString
+    ) {
+        self.init(
+            resolvedBidId: resolvedBidId, eventType: checkpoint.rawValue, errorCode: nil, occurredAt: occurredAt,
+            opaqueUserId: opaqueUserId, placement: placement, page: page, deviceType: deviceType, channel: channel, id: id
+        )
+    }
+
+    /// Reports that the video could not be delivered or played, with the VAST `errorCode` the player raised.
+    public init(
+        resolvedBidId: String,
+        errorCode: Int32,
+        occurredAt: Date,
+        opaqueUserId: String = Topsort.shared.opaqueUserId,
+        placement: Placement? = nil,
+        page: Page? = nil,
+        deviceType: String? = nil,
+        channel: String? = nil,
+        id: String = UUID().uuidString
+    ) {
+        self.init(
+            resolvedBidId: resolvedBidId, eventType: "error", errorCode: errorCode, occurredAt: occurredAt,
+            opaqueUserId: opaqueUserId, placement: placement, page: page, deviceType: deviceType, channel: channel, id: id
+        )
+    }
+
+    private init(
+        resolvedBidId: String,
+        eventType: String,
+        errorCode: Int32?,
+        occurredAt: Date,
+        opaqueUserId: String,
+        placement: Placement?,
+        page: Page?,
+        deviceType: String?,
+        channel: String?,
+        id: String
+    ) {
+        self.resolvedBidId = resolvedBidId
+        self.eventType = eventType
+        self.errorCode = errorCode
+        self.occurredAt = occurredAt
+        self.opaqueUserId = opaqueUserId
+        self.placement = placement
+        self.page = page
+        self.deviceType = deviceType
+        self.channel = channel
+        self.id = id
+    }
+}
+
 public struct PurchaseItem: Codable {
     /// The marketplace ID of the product being purchased.
     let productId: String
@@ -394,52 +521,68 @@ struct Events: Codable {
     let purchases: [PurchaseEvent]?
     let pageviews: [PageViewEvent]?
     let renders: [RenderEvent]?
+    let videoEvents: [VideoEvent]?
 
-    init(impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil) {
+    init(impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil, videoEvents: [VideoEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
         self.renders = renders
+        self.videoEvents = videoEvents
     }
 
-    init(impressions: [Event], clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil) {
+    init(impressions: [Event], clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil, videoEvents: [VideoEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
         self.renders = renders
+        self.videoEvents = videoEvents
     }
 
-    init(clicks: [Event], impressions: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil) {
+    init(clicks: [Event], impressions: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil, videoEvents: [VideoEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
         self.renders = renders
+        self.videoEvents = videoEvents
     }
 
-    init(purchases: [PurchaseEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil) {
+    init(purchases: [PurchaseEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil, videoEvents: [VideoEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
         self.renders = renders
+        self.videoEvents = videoEvents
     }
 
-    init(pageviews: [PageViewEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, renders: [RenderEvent]? = nil) {
+    init(pageviews: [PageViewEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, renders: [RenderEvent]? = nil, videoEvents: [VideoEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
         self.renders = renders
+        self.videoEvents = videoEvents
     }
 
-    init(renders: [RenderEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil) {
+    init(renders: [RenderEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, videoEvents: [VideoEvent]? = nil) {
         self.impressions = impressions
         self.clicks = clicks
         self.purchases = purchases
         self.pageviews = pageviews
         self.renders = renders
+        self.videoEvents = videoEvents
+    }
+
+    init(videoEvents: [VideoEvent], impressions: [Event]? = nil, clicks: [Event]? = nil, purchases: [PurchaseEvent]? = nil, pageviews: [PageViewEvent]? = nil, renders: [RenderEvent]? = nil) {
+        self.impressions = impressions
+        self.clicks = clicks
+        self.purchases = purchases
+        self.pageviews = pageviews
+        self.renders = renders
+        self.videoEvents = videoEvents
     }
 }
