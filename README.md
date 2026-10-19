@@ -145,16 +145,18 @@ Topsort.shared.track(video: failure)
 
 Video events report playback checkpoints and delivery failures of a sponsored video ad, using the IAB VAST tracking-event names, so a player's existing VAST trackers map one to one. They are sponsored-only (`resolvedBidId` is required and must come from a video campaign; the API rejects any other bid) and feed engagement and delivery reporting only: they are never charged or attributed. Report each checkpoint once per `resolvedBidId`. The API requires an `errorCode` on every `error` event, which is why failures have their own initializer. Both initializers take the same optional `placement`, `page`, `deviceType` and `channel` as renders.
 
-`AVPlayer` raises none of these itself: the app reports each checkpoint from the player's own observers. A boundary time observer per checkpoint covers `start` and the quartiles, `AVPlayerItemDidPlayToEndTime` covers `complete`, and `AVPlayerItemFailedToPlayToEndTime` covers `error`. A seek past a quartile skips it, which matches VAST. For example:
+`AVPlayer` raises none of these itself: the app reports each checkpoint from the player's own observers. A boundary time observer per checkpoint covers `start` and the quartiles, `AVPlayerItemDidPlayToEndTime` covers `complete`, and `AVPlayerItemFailedToPlayToEndTime` covers `error`. Boundary observers fire on every crossing, so a seek back would repeat a checkpoint; the example reports each one at most once. For example:
 
 ```swift
 import AVFoundation
 import Topsort
 
-/// Reports one sponsored video ad's VAST checkpoints from an AVPlayer.
+/// Reports one sponsored video ad's VAST checkpoints from an AVPlayer, each at most once.
+@MainActor
 final class VideoAdReporter {
     private let player: AVPlayer
     private let resolvedBidId: String
+    private var reported: Set<VideoCheckpoint> = []
     private var timeObservers: [Any] = []
     private var notificationObservers: [NSObjectProtocol] = []
 
@@ -165,29 +167,33 @@ final class VideoAdReporter {
 
     /// Call once the item is ready to play, so its duration is known.
     func start() {
-        guard let item = player.currentItem, item.duration.isNumeric else { return }
+        guard timeObservers.isEmpty, let item = player.currentItem, item.duration.isNumeric else { return }
         let checkpoints: [(VideoCheckpoint, Float64)] = [(.start, 0.001), (.firstQuartile, 0.25), (.midpoint, 0.5), (.thirdQuartile, 0.75)]
         for (checkpoint, fraction) in checkpoints {
             let time = NSValue(time: CMTimeMultiplyByFloat64(item.duration, multiplier: fraction))
             timeObservers.append(player.addBoundaryTimeObserver(forTimes: [time], queue: .main) { [weak self] in
-                self?.report(VideoEvent(resolvedBidId: self?.resolvedBidId ?? "", checkpoint: checkpoint, occurredAt: Date.now))
+                MainActor.assumeIsolated { self?.report(checkpoint) }
             })
         }
         let center = NotificationCenter.default
         notificationObservers.append(center.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
-            guard let self else { return }
-            report(VideoEvent(resolvedBidId: resolvedBidId, checkpoint: .complete, occurredAt: Date.now))
-            stop()
+            MainActor.assumeIsolated {
+                self?.report(.complete)
+                self?.stop()
+            }
         })
-        notificationObservers.append(center.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { [weak self] _ in
-            guard let self else { return }
-            // AVFoundation reports an NSError: send the closest VAST code, never the NSError's own code.
-            report(VideoEvent(resolvedBidId: resolvedBidId, errorCode: 405, occurredAt: Date.now))
-            stop()
+        notificationObservers.append(center.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { [weak self] notification in
+            let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError
+            let code = Self.vastErrorCode(for: error)
+            MainActor.assumeIsolated {
+                self?.reportError(code)
+                self?.stop()
+            }
         })
     }
 
-    /// Removes the observers, so a replay or a seek back does not report a checkpoint twice.
+    /// Removes every observer. Call it when the ad leaves the screen; time observers must be removed
+    /// from the player that added them.
     func stop() {
         timeObservers.forEach(player.removeTimeObserver)
         timeObservers = []
@@ -195,14 +201,34 @@ final class VideoAdReporter {
         notificationObservers = []
     }
 
-    private func report(_ event: VideoEvent) {
-        Topsort.shared.track(video: event)
+    deinit {
+        timeObservers.forEach(player.removeTimeObserver)
+        notificationObservers.forEach(NotificationCenter.default.removeObserver)
+    }
+
+    private func report(_ checkpoint: VideoCheckpoint) {
+        // Boundary observers fire on every crossing, so a seek back would repeat a checkpoint.
+        guard reported.insert(checkpoint).inserted else { return }
+        Topsort.shared.track(video: VideoEvent(resolvedBidId: resolvedBidId, checkpoint: checkpoint, occurredAt: Date.now))
+    }
+
+    private func reportError(_ vastCode: Int32) {
+        Topsort.shared.track(video: VideoEvent(resolvedBidId: resolvedBidId, errorCode: vastCode, occurredAt: Date.now))
+    }
+
+    /// AVFoundation reports an NSError, but the API takes a VAST error code: map to the closest one,
+    /// never pass the NSError's own code through. Extend this for the errors your player sees.
+    private nonisolated static func vastErrorCode(for error: NSError?) -> Int32 {
+        switch (error?.domain, error?.code) {
+        case (NSURLErrorDomain, NSURLErrorTimedOut): return 402 // timeout of the media file URI
+        case (NSURLErrorDomain, NSURLErrorFileDoesNotExist): return 401 // media file not found
+        default: return 405 // problem displaying the media file
+        }
     }
 }
-
 ```
 
-`errorCode` must be a [VAST error code](https://iabtechlab.com/standards/vast/), not the `NSError` code AVFoundation reports: map the failure to the closest one, such as `401` (file not found), `402` (timeout) or `405` (the media file could not be played). The API accepts any integer, so passing the `NSError` code through is silently wrong in reporting. An item that never becomes ready (`AVPlayerItem.status == .failed`) is an `error` too. Players that speak VAST, such as Google's IMA SDK, already raise these event names and codes, so their callbacks map one to one.
+`errorCode` must be a [VAST error code](https://iabtechlab.com/standards/vast/), not the `NSError` code AVFoundation reports: map the failure to the closest one, such as `401` (file not found), `402` (timeout) or `405` (the media file could not be played). The API accepts any integer, so passing the `NSError` code through is silently wrong in reporting. An item that never becomes ready (`AVPlayerItem.status == .failed`) is an `error` too. Google's IMA SDK raises the same checkpoints under its own names (`STARTED`, `FIRST_QUARTILE`, `MIDPOINT`, `THIRD_QUARTILE`, `COMPLETE`) and reports VAST codes for VAST errors; its own SDK error codes need mapping like any other.
 
 #### Purchases
 
