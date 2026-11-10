@@ -23,6 +23,9 @@ public enum DiscardReason: Sendable {
     case retriesExhausted
     /// The event cannot be serialized, so nothing can ever send it.
     case unserializable
+    /// The event breaks a rule of the events API spec (an empty `id`, a `placement.position`
+    /// below 1, ...). The API would reject the whole request it was sent in, so it is dropped alone.
+    case invalid
 }
 
 /// What happens to the user id the SDK mints when the host has not supplied one.

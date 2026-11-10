@@ -43,7 +43,16 @@ public struct TopsortClient {
     /// double-billed or double-attributed events for whatever chunk actually made it through.
     /// Pass `opaqueUserId` to every event — the initializers' default reaches for
     /// `Topsort.shared`, which mints and persists a device id, so omitting it is not stateless.
+    /// An event that breaks a spec rule the types cannot express (an empty `id`, a
+    /// `placement.position` below 1, ...) is dropped with a warning before anything is sent,
+    /// since the API would reject the whole request it was in.
     public func send(impressions: [Event] = [], clicks: [Event] = [], purchases: [PurchaseEvent] = [], pageviews: [PageViewEvent] = [], renders: [RenderEvent] = [], videoEvents: [VideoEvent] = []) async throws(HTTPClientError) {
+        let impressions = impressions.validOnly()
+        let clicks = clicks.validOnly()
+        let purchases = purchases.validOnly()
+        let pageviews = pageviews.validOnly()
+        let renders = renders.validOnly()
+        let videoEvents = videoEvents.validOnly()
         guard !(impressions.isEmpty && clicks.isEmpty && purchases.isEmpty && pageviews.isEmpty && renders.isEmpty && videoEvents.isEmpty) else { return }
 
         let impressionChunks = impressions.chunked(into: MAX_EVENTS_PER_TYPE_PER_BATCH)
@@ -70,6 +79,16 @@ public struct TopsortClient {
                 throw .unknown(error: error, data: nil)
             }
             _ = try await client.asyncPost(url: eventsURL, data: body, timeoutInterval: timeout)
+        }
+    }
+}
+
+private extension Array where Element: SpecValidated {
+    func validOnly() -> [Element] {
+        filter { event in
+            guard let violation = event.specViolation else { return true }
+            Logger.warning("Dropping an event the API would reject: \(violation)")
+            return false
         }
     }
 }

@@ -80,11 +80,9 @@ public struct Auction: Codable, Equatable {
     let slotId: String?
 
     /**
-     * Discriminator for the device type.
-     * - "desktop"
-     * - "mobile"
+     * The device the ads are meant for. The API defaults to desktop when omitted.
      */
-    let device: String?
+    let device: DeviceType?
     let products: AuctionProducts?
     let category: AuctionCategory?
 
@@ -111,7 +109,7 @@ public struct Auction: Codable, Equatable {
         type: String,
         slots: Int,
         slotId: String? = nil,
-        device: String? = nil,
+        device: DeviceType? = nil,
         products: AuctionProducts? = nil,
         category: AuctionCategory? = nil,
         searchQuery: String? = nil,

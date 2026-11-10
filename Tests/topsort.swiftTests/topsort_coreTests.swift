@@ -201,7 +201,7 @@ class TopsortCoreTests: XCTestCase {
 
     func testTrackPageviewReachesEventManager() throws {
         Topsort.shared.set(opaqueUserId: "test-user")
-        Topsort.shared.track(pageview: PageViewEvent(page: Page(type: "category", pageId: "shoes"), occurredAt: Date.now))
+        Topsort.shared.track(pageview: PageViewEvent(page: Page(type: .category, pageId: "shoes"), occurredAt: Date.now))
         Topsort.shared.flush()
 
         wait(for: [expectation(for: NSPredicate { _, _ in self.mockClient.postCalled }, evaluatedWith: nil)], timeout: 3)

@@ -65,10 +65,13 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 | `@TSDateValue` | `Utils/TSDateValue.swift` | ISO 8601 date serialization with fractional seconds |
 | `Action<I>` / `UnitAction` | `Utils/Action.swift` | Callback type aliases: `(I) -> Void` / `() -> Void` |
 | Typed throws | `AuctionManager` | `throws(AuctionError)` for auction calls |
+| `SpecValidated` | `Models/Events.swift` | Spec rules the types cannot express (empty `id`, `Placement` minimums); `EventManager.push` and `TopsortClient.send` drop a violating event alone |
+| `LossyArray<T>` | `Utils/LossyArray.swift` | Persisted queue decodes per element, so one event an older version wrote cannot lose the file |
 
 ### Type conventions
 - Internal types: `class` singletons (`EventManager`, `AuctionManager`, `HTTPClient`)
 - Public models: `struct` value types conforming to `Codable` (`Event`, `PurchaseEvent`, `Auction`, `AuctionResponse`)
+- Fields the API restricts to a fixed set are enums (`DeviceType`, `Channel`, `ClickType`, `PageType`, `VideoCheckpoint`), never free `String`s
 - UI components are SwiftUI only; UIKit/AppKit appear only behind `canImport` for the lifecycle observer, the background task (`BackgroundTasks.swift`) and image decoding
 
 ## Important Constants & Paths

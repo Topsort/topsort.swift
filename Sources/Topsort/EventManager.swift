@@ -23,6 +23,16 @@ enum EventItem: Codable {
         case .video: return .video
         }
     }
+
+    var specViolation: String? {
+        switch self {
+        case let .click(event), let .impression(event): return event.specViolation
+        case let .purchase(event): return event.specViolation
+        case let .pageview(event): return event.specViolation
+        case let .render(event): return event.specViolation
+        case let .video(event): return event.specViolation
+        }
+    }
 }
 
 enum EventItemKind: Hashable {
@@ -118,7 +128,12 @@ class EventManager {
     private let serialQueue = DispatchQueue(label: "com.topsort.analytics.EventManager")
     private var periodicEvent: PeriodicEvent
     @FilePersistedValue(storePath: PathHelper.path(for: "com.topsort.analytics.event-queue.plist"))
-    var _eventQueue: [EventItem]?
+    var _persistedQueue: LossyArray<EventItem>?
+    var _eventQueue: [EventItem]? {
+        get { _persistedQueue?.elements }
+        set { _persistedQueue = newValue.map(LossyArray.init) }
+    }
+
     private var eventQueue: [EventItem] {
         get {
             if let eq = _eventQueue {
@@ -176,7 +191,7 @@ class EventManager {
         // The queue can afford the 5 s debounce: a lost write costs at most a few events. The
         // pending set is the at-least-once ledger — a batch acknowledged in memory but still on
         // disk is re-sent after a crash and billed twice — so every change is written right away.
-        __eventQueue.deferPersistence = true
+        __persistedQueue.deferPersistence = true
         periodicEvent = PeriodicEvent(interval: 30, action: { EventManager.shared.handlePeriodicEvent() })
         periodicEvent.start()
         lifecycleObserver = LifecycleObserver(
@@ -232,6 +247,11 @@ class EventManager {
 
     func push(event: EventItem) {
         serialQueue.async {
+            if let violation = event.specViolation {
+                Logger.warning("Dropping a \(event.kind) event the API would reject: \(violation)")
+                self.discarded(1, reason: .invalid)
+                return
+            }
             self.eventQueue.append(event)
             if self.eventQueue.count > MAX_QUEUED_EVENTS {
                 let dropped = self.eventQueue.count - MAX_QUEUED_EVENTS
@@ -268,7 +288,7 @@ class EventManager {
         serialQueue.sync {
             self.performSend()
             self.performRetry()
-            self.__eventQueue.persistIfDirty()
+            self.__persistedQueue.persistIfDirty()
             // Never dirty (it persists on every change); the call still drains its queued writes.
             self.__pendingEvents.persistIfDirty()
         }
@@ -322,18 +342,29 @@ class EventManager {
         return batch
     }
 
+    /// An event that breaks a spec rule would get its whole batch rejected with a 400. `push`
+    /// refuses them, but the queue restored from disk can hold events an earlier SDK version
+    /// accepted, so the check runs again here, before anything reaches the wire.
     /// An event that cannot be serialized (a non-finite `Double` in a purchase, say) can
     /// never be sent; keeping it would stall every later batch behind it. Only the offending
     /// events are dropped, not the batch they happened to share.
     private func encode(_ batch: [EventItem]) -> Data? {
+        let valid = batch.filter { $0.specViolation == nil }
+        if valid.count < batch.count {
+            Logger.warning("Dropping \(batch.count - valid.count) queued events the API would reject")
+            discarded(batch.count - valid.count, reason: .invalid)
+        }
+        guard !valid.isEmpty else {
+            return nil
+        }
         let encoder = JSONEncoder()
-        if let data = try? encoder.encode(batch.toEvents()) {
+        if let data = try? encoder.encode(valid.toEvents()) {
             return data
         }
-        let encodable = batch.filter { (try? encoder.encode($0)) != nil }
-        Logger.error("Dropping \(batch.count - encodable.count) events that cannot be serialized")
-        discarded(batch.count - encodable.count, reason: .unserializable)
-        lost(batch.filter { (try? encoder.encode($0)) == nil })
+        let encodable = valid.filter { (try? encoder.encode($0)) != nil }
+        Logger.error("Dropping \(valid.count - encodable.count) events that cannot be serialized")
+        discarded(valid.count - encodable.count, reason: .unserializable)
+        lost(valid.filter { (try? encoder.encode($0)) == nil })
         guard !encodable.isEmpty else {
             return nil
         }

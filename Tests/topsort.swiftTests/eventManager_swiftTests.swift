@@ -500,6 +500,36 @@ class EventManagerTests: XCTestCase {
         waitForDiscard(discards, .unserializable, 1)
     }
 
+    /// An event the API would reject must not reach the queue, where it would get its whole
+    /// batch rejected with a non-retriable 400. It is dropped alone and reported as invalid.
+    func testInvalidEventIsDroppedAloneAndReported() {
+        let discards = recordDiscards()
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        let bad = Event(resolvedBidId: "bid", occurredAt: Date.now, placement: Placement(path: "/home", position: 0))
+        let good = Event(resolvedBidId: "bid", occurredAt: Date.now, placement: Placement(path: "/home", position: 1))
+        eventManager.push(event: .click(bad))
+        eventManager.push(event: .click(good))
+        waitForDiscard(discards, .invalid, 1)
+        let queued = NSPredicate { _, _ in self.eventManager._eventQueue?.count == 1 }
+        wait(for: [expectation(for: queued, evaluatedWith: nil)], timeout: 2)
+    }
+
+    /// The queue restored from disk can hold events an earlier version accepted. One that
+    /// breaks a spec rule must be dropped alone at send time, not get its batch rejected.
+    func testRestoredInvalidEventIsDroppedAtSendTime() throws {
+        let discards = recordDiscards()
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        eventManager._eventQueue = [ // bypasses push, like a queue loaded from disk
+            .click(Event(resolvedBidId: "bid-bad", occurredAt: Date.now, id: "")),
+            .click(Event(resolvedBidId: "bid-ok", occurredAt: Date.now)),
+        ]
+        eventManager.flushAndPersist()
+
+        waitForDiscard(discards, .invalid, 1)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(mockClient.allPostedData.first)) as? [String: Any])
+        XCTAssertEqual((json["clicks"] as? [[String: Any]])?.map { $0["resolvedBidId"] as? String }, ["bid-ok"])
+    }
+
     func testDiscardCallbackOnPermanentRejection() {
         let discards = recordDiscards()
         mockClient.postResult = .failure(.statusCode(code: 401, data: nil))
