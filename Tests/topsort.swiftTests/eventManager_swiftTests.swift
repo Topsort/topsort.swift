@@ -295,6 +295,25 @@ class EventManagerTests: XCTestCase {
         XCTAssertEqual(sizes, [MAX_EVENTS_PER_TYPE_PER_BATCH, 1])
     }
 
+    /// The API caps videoEvents at 50 per request like every other type; past it the whole
+    /// request is a non-retriable 400.
+    func test51VideoEventsAreSplitAcrossTwoBatches() throws {
+        eventManager.flushAt = MAX_QUEUED_EVENTS + 10
+        eventManager._eventQueue = (0 ..< 51).map { i in
+            .video(VideoEvent(resolvedBidId: "bid-\(i)", checkpoint: .midpoint, occurredAt: Date.now))
+        }
+
+        eventManager.flushAndPersist()
+
+        XCTAssertEqual(mockClient.postCallCount, 2)
+        XCTAssertEqual(eventManager._eventQueue?.count, 0)
+        let sizes = try mockClient.allPostedData.map { data -> Int in
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            return try XCTUnwrap(json["videoEvents"] as? [[String: Any]]).count
+        }
+        XCTAssertEqual(sizes, [MAX_EVENTS_PER_TYPE_PER_BATCH, 1])
+    }
+
     /// The bug as originally filed: 60 renders queued alongside 10 clicks used to go out as one
     /// request (well under MAX_EVENTS_PER_BATCH), rejecting the clicks too even though they were
     /// never near their own limit. Each type must be capped independently.
