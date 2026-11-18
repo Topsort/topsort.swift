@@ -144,7 +144,7 @@ let purchase = PurchaseEvent(items: items, occurredAt: Date.now, id: order.id)
 Topsort.shared.track(purchase: purchase)
 ```
 
-`id` is your order id. Always pass it: it makes delivery idempotent when a request is retried, and without it the SDK generates a random UUID that matches nothing in your system. `unitPrice` is the price of one item as a decimal in major currency units (`9.99`, not `999`). `PurchaseItem` also takes `vendorId` for vendor-level attribution.
+`id` is your order id. Always pass it: it makes delivery idempotent when a request is retried, and without it the SDK generates a random UUID that matches nothing in your system. `unitPrice` is the price of one item in the marketplace currency. `PurchaseItem` also takes `vendorId` for vendor-level attribution.
 
 #### Page Views
 
@@ -165,7 +165,7 @@ See all event models in [`Events.swift`](Sources/Topsort/Models/Events.swift).
 
 ### 4. Banners (SwiftUI)
 
-Drop-in banner component that handles the full lifecycle: auction, image loading, render tracking (when the auction returns a winner), impression tracking (when the image has loaded), and click tracking. `deviceType` must be `"desktop"` or `"mobile"`.
+Drop-in banner component that handles the full lifecycle: auction, image loading, render tracking (when the auction returns a winner with an asset), impression tracking (when the image has loaded), and click tracking. `deviceType` must be `"desktop"` or `"mobile"`.
 
 ```swift
 import TopsortBanners
