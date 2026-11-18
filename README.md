@@ -86,8 +86,8 @@ let products = try AuctionProducts(ids: ["p_dsad", "p_dvra", "p_oplf", "p_gjfo"]
 let category = AuctionCategory(id: "c_fdfa")
 
 let auctions = [
-    Auction(type: "banners", slots: 1, slotId: "home-banner", device: "mobile", category: category),
-    Auction(type: "listings", slots: 2, device: "mobile", products: products),
+    Auction(type: "banners", slots: 1, slotId: "home-banner", device: "mobile", category: category, opaqueUserId: Topsort.shared.opaqueUserId),
+    Auction(type: "listings", slots: 2, device: "mobile", products: products, opaqueUserId: Topsort.shared.opaqueUserId),
 ]
 
 let response = try await Topsort.shared.executeAuctions(auctions: auctions)
@@ -98,6 +98,8 @@ for result in response.results {
     }
 }
 ```
+
+Pass the same `opaqueUserId` to auctions and events: Topsort uses it to attribute purchases to the ads a user saw, and `Auction` does not fill it in for you. `device` is `"desktop"` or `"mobile"`; any other value is rejected by the API. `placementId` is a number from 1 to 8 agreed with Topsort; other values are rejected with 400 (`invalid_placement_id`). It is not your banner slot: use `slotId` for that.
 
 See all auction models in [`Auctions.swift`](Sources/Topsort/Models/Auctions.swift).
 
@@ -127,7 +129,7 @@ Topsort.shared.track(impression: event)  // on view appear
 Topsort.shared.track(click: event)       // on tap
 ```
 
-Report each impression once per `resolvedBidId`, when the creative is on screen. Both initializers also take optional context: `placement`, `page`, `deviceType`, `channel`, `additionalAttribution` (a product or vendor `Entity` to attribute purchases to besides the ad's own; only meaningful with `resolvedBidId`) and, for clicks, `clickType` (`"product"`, `"like"`, `"add-to-cart"`).
+Report each impression once per `resolvedBidId`, when the creative is on screen. Both initializers also take optional context: `placement`, `page`, `deviceType` (`"desktop"` or `"mobile"`), `channel`, `additionalAttribution` (a product or vendor `Entity` to attribute purchases to besides the ad's own; only meaningful with `resolvedBidId`) and, for clicks, `clickType` (`"product"`, `"like"`, `"add-to-cart"`).
 
 `Topsort.shared` enforces the once-per-bid rule for impressions and renders: it sends the first report of each `resolvedBidId` for each `opaqueUserId` and drops any later one in the same process, logging a warning the first time. That includes showing the same winner again, from a cached auction response, in a second placement or after navigating back: only the first report is sent. If the first report could not be delivered (the queue gave up on it), the next one is sent. Organic impressions and clicks are never dropped, and `TopsortClient` sends everything it is given.
 
@@ -138,11 +140,11 @@ let items = [
     PurchaseItem(productId: "p1", unitPrice: 9.99, quantity: 2),
     PurchaseItem(productId: "p2", unitPrice: 14.50),
 ]
-let purchase = PurchaseEvent(items: items, occurredAt: Date.now)
+let purchase = PurchaseEvent(items: items, occurredAt: Date.now, id: order.id)
 Topsort.shared.track(purchase: purchase)
 ```
 
-`PurchaseItem` also takes `vendorId` for vendor-level attribution.
+`id` is your order id. Always pass it: it makes delivery idempotent when a request is retried, and without it the SDK generates a random UUID that matches nothing in your system. `unitPrice` is the price of one item as a decimal in major currency units (`9.99`, not `999`). `PurchaseItem` also takes `vendorId` for vendor-level attribution.
 
 #### Page Views
 
@@ -163,7 +165,7 @@ See all event models in [`Events.swift`](Sources/Topsort/Models/Events.swift).
 
 ### 4. Banners (SwiftUI)
 
-Drop-in banner component that handles the full lifecycle: auction, image loading, impression tracking (when the image has loaded), and click tracking.
+Drop-in banner component that handles the full lifecycle: auction, image loading, render tracking (when the auction returns a winner), impression tracking (when the image has loaded), and click tracking. `deviceType` must be `"desktop"` or `"mobile"`.
 
 ```swift
 import TopsortBanners
@@ -205,10 +207,10 @@ try await client.send(clicks: [Event(resolvedBidId: winner.resolvedBidId, occurr
 Topsort (core)              TopsortBanners (UI)
 ├── Topsort.shared          └── TopsortBanner (SwiftUI View)
 │   ├── configure()             ├── Runs auction
-│   ├── track(render:)          ├── Loads & renders image
-│   ├── track(impression:)      ├── Tracks impression on image load
-│   ├── track(click:)           └── Tracks click on tap
-│   ├── track(purchase:)
+│   ├── track(render:)          ├── Tracks render on winner
+│   ├── track(impression:)      ├── Loads & renders image
+│   ├── track(click:)           ├── Tracks impression on image load
+│   ├── track(purchase:)        └── Tracks click on tap
 │   ├── track(pageview:)
 │   ├── flush()
 │   └── executeAuctions()
