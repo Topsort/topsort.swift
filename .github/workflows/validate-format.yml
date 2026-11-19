@@ -8,8 +8,20 @@ on:
 jobs:
   format:
     name: Validate Swift formatting
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - name: Install SwiftFormat 0.63.0
+        env:
+          SWIFTFORMAT_VERSION: "0.63.0"
+          SWIFTFORMAT_SHA256: "28c7802e11fa5ae113d903066439c6bb1be20a8ac1ad9709c42616a7e273fb0f"
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/swiftformat.zip" \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip"
+          echo "${SWIFTFORMAT_SHA256}  $RUNNER_TEMP/swiftformat.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/swiftformat.zip" -d "$RUNNER_TEMP/swiftformat"
+          chmod +x "$RUNNER_TEMP/swiftformat/swiftformat"
+          echo "$RUNNER_TEMP/swiftformat" >> "$GITHUB_PATH"
+      - run: swiftformat --version
       - run: swiftformat --lint --reporter github-actions-log .
