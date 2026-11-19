@@ -221,6 +221,30 @@ class TopsortCoreTests: XCTestCase {
         XCTAssertEqual(discards.all.first?.1, 1)
     }
 
+    func testTrackPurchaseLeavesOutFreeItemsAndSendsTheRest() throws {
+        let discards = DiscardRecorder()
+        var config = Configuration(apiKey: "test-key")
+        config.onEventsDiscarded = { discards.record($0, $1) }
+        try Topsort.shared.configure(config)
+        EventManager.shared.flushAt = 100
+        Topsort.shared.set(opaqueUserId: "test-user")
+
+        Topsort.shared.track(purchase: PurchaseEvent(
+            items: [PurchaseItem(productId: "paid", unitPrice: 10), PurchaseItem(productId: "gift", unitPrice: 0)],
+            occurredAt: Date.now
+        ))
+        Topsort.shared.flush()
+
+        wait(for: [expectation(for: NSPredicate { _, _ in self.mockClient.postCalled }, evaluatedWith: nil)], timeout: 3)
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(mockClient.postData)) as? [String: Any])
+        let purchases = try XCTUnwrap(json["purchases"] as? [[String: Any]])
+        XCTAssertEqual(purchases.count, 1)
+        let items = try XCTUnwrap(purchases.first?["items"] as? [[String: Any]])
+        XCTAssertEqual(items.map { $0["productId"] as? String }, ["paid"])
+        XCTAssertTrue(discards.all.isEmpty)
+    }
+
     func testTrackPageviewReachesEventManager() throws {
         Topsort.shared.set(opaqueUserId: "test-user")
         Topsort.shared.track(pageview: PageViewEvent(page: Page(type: "category", pageId: "shoes"), occurredAt: Date.now))

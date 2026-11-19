@@ -302,7 +302,8 @@ public struct PurchaseItem: Codable {
     let quantity: Int?
 
     /// The price of a single item in the marketplace currency. The API requires it to be greater
-    /// than 0: a purchase with any item at 0 or below is not reported.
+    /// than 0. An item at exactly 0 (a gift) is left out of the report; a purchase whose items are
+    /// all at 0, or with any item below 0, is not reported.
     let unitPrice: Double
 
     /// The vendor ID for halo attribution.
@@ -357,14 +358,36 @@ public struct PurchaseEvent: Codable {
         self.id = id
     }
 
+    /// Items priced at exactly 0, such as gifts. The API rejects them, so they are left out of the
+    /// report instead of failing the purchase they came with.
+    var freeItems: [PurchaseItem] {
+        items.filter { $0.unitPrice == 0 }
+    }
+
+    /// The same purchase without its `freeItems`.
+    func withoutFreeItems() -> PurchaseEvent {
+        PurchaseEvent(
+            items: items.filter { $0.unitPrice != 0 },
+            occurredAt: occurredAt,
+            opaqueUserId: opaqueUserId,
+            deviceType: deviceType,
+            channel: channel,
+            id: id
+        )
+    }
+
     /// Every rule on `items` the events API enforces with a 400, one message per broken field, or
-    /// an empty list when the purchase can be sent. A single bad item fails the whole purchase
-    /// server-side, and a 4xx drops the whole batch it travels in.
+    /// an empty list when the purchase can be sent once its `freeItems` are removed. A single bad
+    /// item fails the whole purchase server-side, and a 4xx drops the whole batch it travels in.
     var validationErrors: [String] {
         if items.isEmpty {
             return ["items must not be empty"]
         }
+        if freeItems.count == items.count {
+            return ["total price is zero: every item has unitPrice 0"]
+        }
         return items.enumerated().flatMap { index, item -> [String] in
+            guard item.unitPrice != 0 else { return [] }
             let prefix = "items[\(index)] (\(item.productId))"
             var errors: [String] = []
             if item.productId.isEmpty {

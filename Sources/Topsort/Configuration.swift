@@ -24,7 +24,7 @@ public enum DiscardReason: Sendable {
     /// The event cannot be serialized, so nothing can ever send it.
     case unserializable
     /// Rejected when tracked, before it was queued, because the API would reject it with a 4xx:
-    /// for example a purchase item with a `unitPrice` of 0. The log names the field.
+    /// for example a purchase whose items all have a `unitPrice` of 0. The log names the field.
     case invalidEvent
 }
 

@@ -99,8 +99,25 @@ class EventModelTests: XCTestCase {
         XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: 9.99)]), [], "quantity defaults to 1 in the API")
     }
 
-    func testPurchaseWithZeroUnitPriceIsInvalid() {
-        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: 0)]), ["items[0] (p1): unitPrice must be a finite number greater than 0, was 0.0"])
+    func testPurchaseWithEveryItemAtZeroIsInvalid() {
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: 0)]), ["total price is zero: every item has unitPrice 0"])
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: 0), PurchaseItem(productId: "p2", unitPrice: 0)]), ["total price is zero: every item has unitPrice 0"])
+    }
+
+    func testFreeItemsAreLeftOutAndTheRestIsValid() {
+        let event = PurchaseEvent(
+            items: [PurchaseItem(productId: "paid", unitPrice: 10), PurchaseItem(productId: "gift", unitPrice: 0)],
+            occurredAt: Date.now,
+            opaqueUserId: "u1",
+            id: "order-1"
+        )
+        XCTAssertEqual(event.validationErrors, [])
+        XCTAssertEqual(event.freeItems.map(\.productId), ["gift"])
+        let sent = event.withoutFreeItems()
+        XCTAssertEqual(sent.items.map(\.productId), ["paid"])
+        XCTAssertEqual(sent.id, "order-1")
+        XCTAssertEqual(sent.opaqueUserId, "u1")
+        XCTAssertEqual(sent.occurredAt, event.occurredAt)
     }
 
     func testPurchaseWithNegativeUnitPriceIsInvalid() {
@@ -128,11 +145,11 @@ class EventModelTests: XCTestCase {
     func testPurchaseValidationReportsEveryBrokenFieldOfEveryItem() {
         let result = errors([
             PurchaseItem(productId: "ok", unitPrice: 1),
-            PurchaseItem(productId: "bad", unitPrice: 0, quantity: 0),
+            PurchaseItem(productId: "bad", unitPrice: -1, quantity: 0),
         ])
         XCTAssertEqual(result, [
             "items[1] (bad): quantity must be at least 1, was 0",
-            "items[1] (bad): unitPrice must be a finite number greater than 0, was 0.0",
+            "items[1] (bad): unitPrice must be a finite number greater than 0, was -1.0",
         ])
     }
 

@@ -134,7 +134,11 @@ public class Topsort: TopsortProtocol {
             EventManager.shared.discardInvalid()
             return
         }
-        EventManager.shared.push(event: .purchase(event))
+        let free = event.freeItems
+        if !free.isEmpty {
+            Logger.debug("Purchase \(event.id): left out \(free.count) item(s) with unitPrice 0: \(free.map(\.productId).joined(separator: ", "))")
+        }
+        EventManager.shared.push(event: .purchase(event.withoutFreeItems()))
     }
 
     public func track(pageview event: PageViewEvent) {
