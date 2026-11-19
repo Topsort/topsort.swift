@@ -95,7 +95,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 ## Code Style
 
 - **Always run `swiftformat .` before opening a PR** to avoid CI failures
-- **swiftformat** enforced in CI (default rules, no `.swiftformat` config file)
+- **swiftformat** enforced in CI (default rules, no `.swiftformat` config file). CI pins SwiftFormat 0.63.0; use the same version locally
 - Source files: PascalCase (`EventManager.swift`, `BannerView.swift`)
 - Test targets: lowercase with dots (`topsort.swiftTests`, `banners.swiftTests`)
 - No `.swift-version` file: swiftformat reads it as the *language* version, and anything above 5.3 turns on rules the sources do not follow. The toolchain requirement lives in README and `Package.swift`
@@ -105,7 +105,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 | Workflow | Trigger | Runner | Command |
 |----------|---------|--------|---------|
 | Test | push to main, PR | macos-15 | `swift build` + `swift test`; `xcodebuild test` on an iPhone simulator |
-| Format | PR (*.swift changes) | macos-15 | `swiftformat --lint .` |
+| Format | PR (*.swift changes) | macos-15 | `swiftformat --lint .` (pinned to 0.63.0) |
 | Typos | PR (*.md, *.yml, *.swift) | ubuntu-22.04 | `crate-ci/typos@v1.24.1` |
 | Actions | PR (.github/workflows/*) | ubuntu-latest | `actionlint v1.7.7` |
 | Conventional Commits | PR (opened/edited/synchronize) | ubuntu-24.04 | `amannn/action-semantic-pull-request` |
