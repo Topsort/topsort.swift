@@ -297,10 +297,12 @@ public struct PurchaseItem: Codable {
     /// The marketplace ID of the product being purchased.
     let productId: String
 
-    /// Count of products purchased.
+    /// Count of products purchased, at least 1 when set (the API defaults it to 1).
+    /// A purchase with any item below 1 is not reported.
     let quantity: Int?
 
-    /// The price of a single item in the marketplace currency.
+    /// The price of a single item in the marketplace currency. The API requires it to be greater
+    /// than 0: a purchase with any item at 0 or below is not reported.
     let unitPrice: Double
 
     /// The vendor ID for halo attribution.
@@ -353,6 +355,29 @@ public struct PurchaseEvent: Codable {
         self.deviceType = deviceType
         self.channel = channel
         self.id = id
+    }
+
+    /// Every rule on `items` the events API enforces with a 400, one message per broken field, or
+    /// an empty list when the purchase can be sent. A single bad item fails the whole purchase
+    /// server-side, and a 4xx drops the whole batch it travels in.
+    var validationErrors: [String] {
+        if items.isEmpty {
+            return ["items must not be empty"]
+        }
+        return items.enumerated().flatMap { index, item -> [String] in
+            let prefix = "items[\(index)] (\(item.productId))"
+            var errors: [String] = []
+            if item.productId.isEmpty {
+                errors.append("\(prefix): productId must not be empty")
+            }
+            if let quantity = item.quantity, quantity < 1 {
+                errors.append("\(prefix): quantity must be at least 1, was \(quantity)")
+            }
+            if !(item.unitPrice.isFinite && item.unitPrice > 0) {
+                errors.append("\(prefix): unitPrice must be a finite number greater than 0, was \(item.unitPrice)")
+            }
+            return errors
+        }
     }
 }
 

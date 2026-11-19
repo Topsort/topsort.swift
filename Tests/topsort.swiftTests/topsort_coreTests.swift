@@ -199,6 +199,28 @@ class TopsortCoreTests: XCTestCase {
         XCTAssertTrue(mockClient.postCalled)
     }
 
+    func testTrackInvalidPurchaseIsDiscardedAndOtherEventsStillSent() throws {
+        let discards = DiscardRecorder()
+        var config = Configuration(apiKey: "test-key")
+        config.onEventsDiscarded = { discards.record($0, $1) }
+        try Topsort.shared.configure(config)
+        EventManager.shared.flushAt = 100
+        Topsort.shared.set(opaqueUserId: "test-user")
+
+        Topsort.shared.track(purchase: PurchaseEvent(items: [PurchaseItem(productId: "p1", unitPrice: 0)], occurredAt: Date.now))
+        Topsort.shared.track(click: Event(entity: Entity(type: .product, id: "p2"), occurredAt: Date.now))
+        Topsort.shared.flush()
+
+        wait(for: [expectation(for: NSPredicate { _, _ in self.mockClient.postCalled }, evaluatedWith: nil)], timeout: 3)
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(mockClient.postData)) as? [String: Any])
+        XCTAssertTrue((json["purchases"] as? [Any])?.isEmpty ?? true)
+        XCTAssertEqual((json["clicks"] as? [[String: Any]])?.count, 1)
+        XCTAssertEqual(discards.all.count, 1)
+        XCTAssertEqual(discards.all.first?.0, .invalidEvent)
+        XCTAssertEqual(discards.all.first?.1, 1)
+    }
+
     func testTrackPageviewReachesEventManager() throws {
         Topsort.shared.set(opaqueUserId: "test-user")
         Topsort.shared.track(pageview: PageViewEvent(page: Page(type: "category", pageId: "shoes"), occurredAt: Date.now))
@@ -241,5 +263,17 @@ class TopsortCoreTests: XCTestCase {
         wait(for: [exp], timeout: 3)
 
         XCTAssertTrue(mockClient.postCalled)
+    }
+}
+
+private final class DiscardRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _all: [(DiscardReason, Int)] = []
+    var all: [(DiscardReason, Int)] {
+        lock.withLock { _all }
+    }
+
+    func record(_ reason: DiscardReason, _ count: Int) {
+        lock.withLock { _all.append((reason, count)) }
     }
 }

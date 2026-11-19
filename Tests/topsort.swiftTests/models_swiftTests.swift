@@ -88,6 +88,54 @@ class EventModelTests: XCTestCase {
         XCTAssertEqual(json["opaqueUserId"] as? String, "injected-user")
     }
 
+    // MARK: - PurchaseEvent validation
+
+    private func errors(_ items: [PurchaseItem]) -> [String] {
+        PurchaseEvent(items: items, occurredAt: Date.now).validationErrors
+    }
+
+    func testValidPurchaseHasNoValidationErrors() {
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: 0.01, quantity: 1)]), [])
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: 9.99)]), [], "quantity defaults to 1 in the API")
+    }
+
+    func testPurchaseWithZeroUnitPriceIsInvalid() {
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: 0)]), ["items[0] (p1): unitPrice must be a finite number greater than 0, was 0.0"])
+    }
+
+    func testPurchaseWithNegativeUnitPriceIsInvalid() {
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: -5)]), ["items[0] (p1): unitPrice must be a finite number greater than 0, was -5.0"])
+    }
+
+    func testPurchaseWithNonFiniteUnitPriceIsInvalid() {
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: .nan)]).count, 1)
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: .infinity)]).count, 1)
+    }
+
+    func testPurchaseWithZeroQuantityIsInvalid() {
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: 1, quantity: 0)]), ["items[0] (p1): quantity must be at least 1, was 0"])
+    }
+
+    func testPurchaseWithNegativeQuantityIsInvalid() {
+        XCTAssertEqual(errors([PurchaseItem(productId: "p1", unitPrice: 1, quantity: -2)]), ["items[0] (p1): quantity must be at least 1, was -2"])
+    }
+
+    func testPurchaseWithEmptyItemsOrProductIdIsInvalid() {
+        XCTAssertEqual(errors([]), ["items must not be empty"])
+        XCTAssertEqual(errors([PurchaseItem(productId: "", unitPrice: 1)]), ["items[0] (): productId must not be empty"])
+    }
+
+    func testPurchaseValidationReportsEveryBrokenFieldOfEveryItem() {
+        let result = errors([
+            PurchaseItem(productId: "ok", unitPrice: 1),
+            PurchaseItem(productId: "bad", unitPrice: 0, quantity: 0),
+        ])
+        XCTAssertEqual(result, [
+            "items[1] (bad): quantity must be at least 1, was 0",
+            "items[1] (bad): unitPrice must be a finite number greater than 0, was 0.0",
+        ])
+    }
+
     // MARK: - Entity encoding
 
     func testEntityProductEncoding() throws {
