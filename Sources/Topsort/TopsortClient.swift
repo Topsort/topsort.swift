@@ -27,7 +27,8 @@ public struct TopsortClient {
         self.timeout = timeout
     }
 
-    /// Runs 1–5 auctions and returns the winners.
+    /// Runs 1–5 auctions and returns the winners. Auctions are sent as given: set
+    /// `opaqueUserId` on each, to the same id you pass to its events.
     public func auctions(_ auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
         try await AuctionManager.executeAuctions(auctions, client: client, url: auctionsURL, timeout: timeout)
     }

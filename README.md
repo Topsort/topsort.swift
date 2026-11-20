@@ -86,8 +86,8 @@ let products = try AuctionProducts(ids: ["p_dsad", "p_dvra", "p_oplf", "p_gjfo"]
 let category = AuctionCategory(id: "c_fdfa")
 
 let auctions = [
-    Auction(type: "banners", slots: 1, slotId: "home-banner", device: "mobile", category: category, opaqueUserId: Topsort.shared.opaqueUserId),
-    Auction(type: "listings", slots: 2, device: "mobile", products: products, opaqueUserId: Topsort.shared.opaqueUserId),
+    Auction(type: "banners", slots: 1, slotId: "home-banner", device: "mobile", category: category),
+    Auction(type: "listings", slots: 2, device: "mobile", products: products),
 ]
 
 let response = try await Topsort.shared.executeAuctions(auctions: auctions)
@@ -99,7 +99,7 @@ for result in response.results {
 }
 ```
 
-Pass the same `opaqueUserId` to auctions and events: Topsort uses it to attribute purchases to the ads a user saw, and `Auction` does not fill it in for you. `device` is `"desktop"` or `"mobile"`; any other value is rejected by the API. `placementId` is a number from 1 to 8 agreed with Topsort; other values are rejected with 400 (`invalid_placement_id`). It is not your banner slot: use `slotId` for that.
+Auctions and events must share an `opaqueUserId`: Topsort uses it to attribute purchases to the ads a user saw. `Topsort.shared.executeAuctions` fills it in from `Topsort.shared.opaqueUserId`, the id events default to, for any auction that does not set one. To use your own id, call `Topsort.shared.set(opaqueUserId:)` rather than setting it on each auction, so events pick it up too. `device` is `"desktop"` or `"mobile"`; any other value is rejected by the API. `placementId` is a number from 1 to 8 agreed with Topsort; other values are rejected with 400 (`invalid_placement_id`). It is not your banner slot: use `slotId` for that.
 
 See all auction models in [`Auctions.swift`](Sources/Topsort/Models/Auctions.swift).
 
@@ -191,7 +191,7 @@ TopsortBanner(bannerAuctionBuilder: .init(slotId: "home-banner", deviceType: "mo
 
 ### 5. Hands-on: `TopsortClient`
 
-If you run your own event pipeline and only want the models and the transport, `TopsortClient` makes one request at a time and keeps nothing — no queue, retry or persistence. A thrown error means you still own the events. Pass `opaqueUserId` to every event: the initializers' default reaches for `Topsort.shared`, which mints and persists a device id.
+If you run your own event pipeline and only want the models and the transport, `TopsortClient` makes one request at a time and keeps nothing — no queue, retry or persistence. A thrown error means you still own the events. Pass the same `opaqueUserId` to every auction and every event: auctions are sent as given, and the initializers' default reaches for `Topsort.shared`, which mints and persists a device id.
 
 ```swift
 let client = try TopsortClient(apiKey: "your-api-key")
