@@ -198,6 +198,14 @@ public class Topsort: TopsortProtocol {
         guard isConfigured else {
             throw .notConfigured
         }
+        // Auctions without a user get the identity events use, so both sides of an ad share it.
+        var auctions = auctions
+        if auctions.contains(where: { $0.opaqueUserId == nil }) {
+            let userId = opaqueUserId
+            for index in auctions.indices where auctions[index].opaqueUserId == nil {
+                auctions[index].opaqueUserId = userId
+            }
+        }
         return try await AuctionManager.shared.executeAuctions(auctions: auctions)
     }
 }

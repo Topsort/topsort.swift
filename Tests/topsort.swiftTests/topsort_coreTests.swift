@@ -139,6 +139,58 @@ class TopsortCoreTests: XCTestCase {
         }
     }
 
+    // MARK: - Auction identity
+
+    private func runAuctions(_ auctions: [Auction]) async throws -> [String?] {
+        let auctionClient = MockHTTPClient(
+            apiKey: "test-key",
+            postResult: .success(Data(#"{"results":[{"resultType":"listings","winners":[],"error":false}]}"#.utf8))
+        )
+        let previousClient = AuctionManager.shared.client
+        AuctionManager.shared.client = auctionClient
+        defer { AuctionManager.shared.client = previousClient }
+
+        _ = try await Topsort.shared.executeAuctions(auctions: auctions)
+
+        let body = try XCTUnwrap(auctionClient.postData)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let sent = try XCTUnwrap(json["auctions"] as? [[String: Any]])
+        return sent.map { $0["opaqueUserId"] as? String }
+    }
+
+    func testExecuteAuctionsFillsMissingOpaqueUserIdWithEventIdentity() async throws {
+        Topsort.shared.set(opaqueUserId: "shared-user")
+
+        let sent = try await runAuctions([Auction(type: "listings", slots: 2)])
+
+        let event = Event(resolvedBidId: "bid", occurredAt: Date.now)
+        XCTAssertEqual(sent, [event.opaqueUserId])
+        XCTAssertEqual(sent, ["shared-user"])
+    }
+
+    func testExecuteAuctionsKeepsExplicitOpaqueUserId() async throws {
+        Topsort.shared.set(opaqueUserId: "shared-user")
+
+        let sent = try await runAuctions([
+            Auction(type: "listings", slots: 1, opaqueUserId: "explicit-user"),
+            Auction(type: "listings", slots: 1),
+        ])
+
+        XCTAssertEqual(sent, ["explicit-user", "shared-user"])
+    }
+
+    func testExecuteAuctionsFollowsIdentityChange() async throws {
+        Topsort.shared.set(opaqueUserId: "before-login")
+        let before = try await runAuctions([Auction(type: "listings", slots: 1)])
+
+        Topsort.shared.set(opaqueUserId: "after-login")
+        let after = try await runAuctions([Auction(type: "listings", slots: 1)])
+
+        XCTAssertEqual(before, ["before-login"])
+        XCTAssertEqual(after, ["after-login"])
+        XCTAssertEqual(Event(resolvedBidId: "bid", occurredAt: Date.now).opaqueUserId, "after-login")
+    }
+
     // MARK: - Configure
 
     func testConfigureSetsIsConfigured() {
