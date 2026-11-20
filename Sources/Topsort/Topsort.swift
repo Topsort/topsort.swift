@@ -126,7 +126,19 @@ public class Topsort: TopsortProtocol {
             Logger.warning("track(purchase:) called before configure(). Event dropped.")
             return
         }
-        EventManager.shared.push(event: .purchase(event))
+        // The API fails the whole batch on one bad purchase, and a 4xx is never retried, so
+        // sending it would lose every event it travels with. Lose only it, here, where the log can say why.
+        let errors = event.validationErrors
+        guard errors.isEmpty else {
+            Logger.error("Purchase \(event.id) not reported: \(errors.joined(separator: "; "))")
+            EventManager.shared.discardInvalid()
+            return
+        }
+        let free = event.freeItems
+        if !free.isEmpty {
+            Logger.debug("Purchase \(event.id): left out \(free.count) item(s) with unitPrice 0: \(free.map(\.productId).joined(separator: ", "))")
+        }
+        EventManager.shared.push(event: .purchase(event.withoutFreeItems()))
     }
 
     public func track(pageview event: PageViewEvent) {

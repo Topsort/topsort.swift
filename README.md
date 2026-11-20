@@ -246,7 +246,7 @@ A `track` call appends the event to an in-memory queue and returns; nothing happ
 
 `configure()` throws `ConfigurationError` for an invalid `url`, `flushAt < 1` or `flushInterval <= 0`; until it succeeds, `track()` logs and drops the event and `executeAuctions()` throws `AuctionError.notConfigured`.
 
-Events the SDK gives up on are logged and dropped, and reported to `Configuration.onEventsDiscarded` with a `DiscardReason` and a count if you set it (queue eviction is logged at `.warning`, once per episode; the rest at `.error`): rejected by the API with a 4xx (408 and 429 are retried instead), retried 50 times without success, evicted as the oldest once the queue passes 5,000 events, or impossible to serialize (a non-finite `unitPrice`, say — only the offending event is dropped, not its batch).
+Events the SDK gives up on are logged and dropped, and reported to `Configuration.onEventsDiscarded` with a `DiscardReason` and a count if you set it (queue eviction is logged at `.warning`, once per episode; the rest at `.error`): rejected by the API with a 4xx (408 and 429 are retried instead), retried 50 times without success, evicted as the oldest once the queue passes 5,000 events, or impossible to serialize (only the offending event is dropped, not its batch). Items with a `unitPrice` of exactly 0 (gifts, say) are left out of the purchase before it is queued, since the API rejects them. A purchase the API would still reject (empty `items`, every item at 0, an empty `productId`, a `unitPrice` that is negative or not finite, or a `quantity` below 1) is dropped by `track(purchase:)` before it is queued, logged with the field at fault, and reported as `.invalidEvent`.
 
 `executeAuctions()` throws `AuctionError`:
 
