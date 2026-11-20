@@ -136,7 +136,7 @@ All tests use `@testable import` to access internal types.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages (e.g., `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`).
 - Never approve or merge a PR that has unresolved review comments — address or explicitly dismiss each one first. Always check nested/threaded comments (e.g. replies under bot comments) as they may contain substantive issues not visible at the top level.
 - Before merging with `--admin`, wait at least **5 minutes** after the PR is opened. This gives Bugbot and other async bots time to post their comments. After the wait, check all PR comments (including nested/threaded replies) for unresolved issues before merging.
-- After every significant architectural change, review this `AGENTS.md` and update it if the change affects documented patterns, constraints, or workflows.
+- After every significant architectural change, review this `AGENTS.md` and, if the change affects documented patterns, constraints, or workflows, propose the update. Apply it only after explicit approval: this file is shared by every AI tool working on the repo.
 
 ## Pull Requests
 
