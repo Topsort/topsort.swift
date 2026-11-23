@@ -96,8 +96,10 @@ public struct Auction: Codable, Equatable {
 
     /**
      * An opaque user identifier for auction targeting context.
+     * When nil or empty, `Topsort.shared.executeAuctions` sends `Topsort.shared.opaqueUserId`, the
+     * same id events default to. `TopsortClient` sends it as given.
      */
-    let opaqueUserId: String?
+    var opaqueUserId: String?
 
     /**
      * Experiment bucket identifier (1-8) used for A/B testing in conjunction

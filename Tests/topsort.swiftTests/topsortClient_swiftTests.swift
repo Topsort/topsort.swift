@@ -42,6 +42,26 @@ class TopsortClientTests: XCTestCase {
         }
     }
 
+    func testAuctionsSendsOpaqueUserIdAsGiven() async throws {
+        var body: Data?
+        MockURLProtocol.requestHandler = { request in
+            let stream = request.httpBodyStream!
+            stream.open()
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            let read = stream.read(&buffer, maxLength: buffer.count)
+            body = Data(buffer[0 ..< max(read, 0)])
+            let response = Data(#"{"results":[{"resultType":"listings","winners":[],"error":false},{"resultType":"listings","winners":[],"error":false}]}"#.utf8)
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, response)
+        }
+        _ = try await client.auctions([
+            Auction(type: "listings", slots: 1),
+            Auction(type: "listings", slots: 1, opaqueUserId: "u1"),
+        ])
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(body)) as? [String: Any])
+        let sent = try XCTUnwrap(json["auctions"] as? [[String: Any]])
+        XCTAssertEqual(sent.map { $0["opaqueUserId"] as? String }, [nil, "u1"])
+    }
+
     func testSendPostsOnlyTheNonEmptyEventLists() async throws {
         var body: Data?
         MockURLProtocol.requestHandler = { request in

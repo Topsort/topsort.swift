@@ -33,15 +33,24 @@ class AuctionManager {
         }
     }
 
-    func executeAuctions(auctions: [Auction]) async throws(AuctionError) -> AuctionResponse {
-        try await Self.executeAuctions(auctions, client: client, url: url, timeout: timeoutInterval)
+    func executeAuctions(auctions: [Auction], defaultOpaqueUserId: (() -> String)? = nil) async throws(AuctionError) -> AuctionResponse {
+        try await Self.executeAuctions(auctions, client: client, url: url, timeout: timeoutInterval, defaultOpaqueUserId: defaultOpaqueUserId)
     }
 
-    /// The request itself, shared with `TopsortClient`.
-    static func executeAuctions(_ auctions: [Auction], client: HTTPClient, url: URL, timeout: TimeInterval) async throws(AuctionError) -> AuctionResponse {
+    /// The request itself, shared with `TopsortClient`. When `defaultOpaqueUserId` is given, auctions
+    /// with a nil or empty `opaqueUserId` get its value; it is read only once the count is valid.
+    static func executeAuctions(_ auctions: [Auction], client: HTTPClient, url: URL, timeout: TimeInterval, defaultOpaqueUserId: (() -> String)? = nil) async throws(AuctionError) -> AuctionResponse {
         if auctions.count > MAX_AUCTIONS || auctions.count < MIN_AUCTIONS {
             Logger.error("Invalid number of auctions: \(auctions.count), must be between \(MIN_AUCTIONS) and \(MAX_AUCTIONS)")
             throw AuctionError.invalidNumberAuctions(count: auctions.count)
+        }
+        var auctions = auctions
+        let lacksUser: (Auction) -> Bool = { $0.opaqueUserId?.isEmpty ?? true }
+        if let defaultOpaqueUserId, auctions.contains(where: lacksUser) {
+            let userId = defaultOpaqueUserId()
+            for index in auctions.indices where lacksUser(auctions[index]) {
+                auctions[index].opaqueUserId = userId
+            }
         }
         guard let auctionsData = try? JSONEncoder().encode(["auctions": auctions]) else {
             Logger.error("Failed to serialize auctions: \(auctions)")

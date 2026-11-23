@@ -198,6 +198,7 @@ public class Topsort: TopsortProtocol {
         guard isConfigured else {
             throw .notConfigured
         }
-        return try await AuctionManager.shared.executeAuctions(auctions: auctions)
+        // Auctions without a user get the identity events use, so both sides of an ad share it.
+        return try await AuctionManager.shared.executeAuctions(auctions: auctions, defaultOpaqueUserId: { self.opaqueUserId })
     }
 }
