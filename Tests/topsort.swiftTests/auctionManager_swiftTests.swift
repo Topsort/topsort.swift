@@ -72,6 +72,24 @@ class AuctionManagerTests: XCTestCase {
         XCTAssertNil(response)
     }
 
+    func testExecuteAuctionsDoesNotReadDefaultOpaqueUserIdForInvalidCount() async {
+        let auctions = Array(repeating: Auction(type: "listings", slots: 1), count: 6)
+        var idRead = false
+
+        do {
+            _ = try await auctionManager.executeAuctions(auctions: auctions, defaultOpaqueUserId: {
+                idRead = true
+                return "minted"
+            })
+            XCTFail("expected invalidNumberAuctions")
+        } catch {
+            guard case .invalidNumberAuctions(6) = error else { return XCTFail("got \(error)") }
+        }
+
+        XCTAssertFalse(idRead)
+        XCTAssertFalse(mockClient.postCalled)
+    }
+
     func testExecuteAuctionsWithSerializationError() async {
         let auctions = [Auction(type: "mobile", slots: 1)]
         let responseData = Data(

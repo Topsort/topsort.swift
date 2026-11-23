@@ -199,15 +199,6 @@ public class Topsort: TopsortProtocol {
             throw .notConfigured
         }
         // Auctions without a user get the identity events use, so both sides of an ad share it.
-        // Skipped for a batch AuctionManager will reject, so no id is minted for it.
-        var auctions = auctions
-        let lacksUser: (Auction) -> Bool = { $0.opaqueUserId?.isEmpty ?? true }
-        if (MIN_AUCTIONS ... MAX_AUCTIONS).contains(auctions.count), auctions.contains(where: lacksUser) {
-            let userId = opaqueUserId
-            for index in auctions.indices where lacksUser(auctions[index]) {
-                auctions[index].opaqueUserId = userId
-            }
-        }
-        return try await AuctionManager.shared.executeAuctions(auctions: auctions)
+        return try await AuctionManager.shared.executeAuctions(auctions: auctions, defaultOpaqueUserId: { self.opaqueUserId })
     }
 }
