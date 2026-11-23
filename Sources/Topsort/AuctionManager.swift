@@ -1,8 +1,8 @@
 import Foundation
 
 private let AUCTIONS_TOPSORT_URL = URL(string: "https://api.topsort.com/v2/auctions")!
-private let MIN_AUCTIONS = 1
-private let MAX_AUCTIONS = 5
+let MIN_AUCTIONS = 1
+let MAX_AUCTIONS = 5
 
 public enum AuctionError: Error {
     case http(error: HTTPClientError)

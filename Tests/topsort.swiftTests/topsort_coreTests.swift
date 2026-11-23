@@ -27,6 +27,7 @@ class TopsortCoreTests: XCTestCase {
     }
 
     override func tearDown() {
+        Topsort.shared.set(opaqueUserId: nil)
         Topsort.shared.isConfigured = true
         AuctionManager.shared.timeoutInterval = 60
         mockClient = nil
@@ -189,6 +190,14 @@ class TopsortCoreTests: XCTestCase {
         XCTAssertEqual(before, ["before-login"])
         XCTAssertEqual(after, ["after-login"])
         XCTAssertEqual(Event(resolvedBidId: "bid", occurredAt: Date.now).opaqueUserId, "after-login")
+    }
+
+    func testExecuteAuctionsFillsEmptyOpaqueUserId() async throws {
+        Topsort.shared.set(opaqueUserId: "shared-user")
+
+        let sent = try await runAuctions([Auction(type: "listings", slots: 1, opaqueUserId: "")])
+
+        XCTAssertEqual(sent, ["shared-user"])
     }
 
     // MARK: - Configure
