@@ -21,7 +21,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Topsort/topsort.swift.git", from: "1.4.1"), // x-release-please-version
+    .package(url: "https://github.com/Topsort/topsort.swift.git", from: "1.4.2"), // x-release-please-version
 ]
 ```
 
@@ -86,8 +86,8 @@ let products = try AuctionProducts(ids: ["p_dsad", "p_dvra", "p_oplf", "p_gjfo"]
 let category = AuctionCategory(id: "c_fdfa")
 
 let auctions = [
-    Auction(type: "banners", slots: 1, slotId: "home-banner", device: "mobile", category: category),
-    Auction(type: "listings", slots: 2, device: "mobile", products: products),
+    Auction(type: "banners", slots: 1, slotId: "home-banner", device: "mobile", category: category, opaqueUserId: Topsort.shared.opaqueUserId),
+    Auction(type: "listings", slots: 2, device: "mobile", products: products, opaqueUserId: Topsort.shared.opaqueUserId),
 ]
 
 let response = try await Topsort.shared.executeAuctions(auctions: auctions)
@@ -98,6 +98,8 @@ for result in response.results {
     }
 }
 ```
+
+Pass the same `opaqueUserId` to auctions and events: Topsort uses it to attribute purchases to the ads a user saw, and `Auction` does not fill it in for you. `device` is `"desktop"` or `"mobile"`; any other value is rejected by the API. `placementId` is a number from 1 to 8 agreed with Topsort; other values are rejected with 400 (`invalid_placement_id`). It is not your banner slot: use `slotId` for that.
 
 See all auction models in [`Auctions.swift`](Sources/Topsort/Models/Auctions.swift).
 
@@ -127,7 +129,7 @@ Topsort.shared.track(impression: event)  // on view appear
 Topsort.shared.track(click: event)       // on tap
 ```
 
-Report each impression once per `resolvedBidId`, when the creative is on screen. Both initializers also take optional context: `placement`, `page`, `deviceType`, `channel`, `additionalAttribution` (a product or vendor `Entity` to attribute purchases to besides the ad's own; only meaningful with `resolvedBidId`) and, for clicks, `clickType` (`"product"`, `"like"`, `"add-to-cart"`).
+Report each impression once per `resolvedBidId`, when the creative is on screen. Both initializers also take optional context: `placement`, `page`, `deviceType` (`"desktop"` or `"mobile"`), `channel`, `additionalAttribution` (a product or vendor `Entity` to attribute purchases to besides the ad's own; only meaningful with `resolvedBidId`) and, for clicks, `clickType` (`"product"`, `"like"`, `"add-to-cart"`).
 
 `Topsort.shared` enforces the once-per-bid rule for impressions and renders: it sends the first report of each `resolvedBidId` for each `opaqueUserId` and drops any later one in the same process, logging a warning the first time. That includes showing the same winner again, from a cached auction response, in a second placement or after navigating back: only the first report is sent. If the first report could not be delivered (the queue gave up on it), the next one is sent. Organic impressions and clicks are never dropped, and `TopsortClient` sends everything it is given.
 
@@ -138,11 +140,11 @@ let items = [
     PurchaseItem(productId: "p1", unitPrice: 9.99, quantity: 2),
     PurchaseItem(productId: "p2", unitPrice: 14.50),
 ]
-let purchase = PurchaseEvent(items: items, occurredAt: Date.now)
+let purchase = PurchaseEvent(items: items, occurredAt: Date.now, id: order.id)
 Topsort.shared.track(purchase: purchase)
 ```
 
-`PurchaseItem` also takes `vendorId` for vendor-level attribution.
+`id` is your order id. Always pass it: it makes delivery idempotent when a request is retried, and without it the SDK generates a random UUID that matches nothing in your system. `unitPrice` is the price of one item in the marketplace currency. `PurchaseItem` also takes `vendorId` for vendor-level attribution.
 
 #### Page Views
 
@@ -163,7 +165,7 @@ See all event models in [`Events.swift`](Sources/Topsort/Models/Events.swift).
 
 ### 4. Banners (SwiftUI)
 
-Drop-in banner component that handles the full lifecycle: auction, image loading, impression tracking (when the image has loaded), and click tracking.
+Drop-in banner component that handles the full lifecycle: auction, image loading, render tracking (when the auction returns a winner with an asset), impression tracking (when the image has loaded), and click tracking. `deviceType` must be `"desktop"` or `"mobile"`.
 
 ```swift
 import TopsortBanners
@@ -205,10 +207,10 @@ try await client.send(clicks: [Event(resolvedBidId: winner.resolvedBidId, occurr
 Topsort (core)              TopsortBanners (UI)
 ├── Topsort.shared          └── TopsortBanner (SwiftUI View)
 │   ├── configure()             ├── Runs auction
-│   ├── track(render:)          ├── Loads & renders image
-│   ├── track(impression:)      ├── Tracks impression on image load
-│   ├── track(click:)           └── Tracks click on tap
-│   ├── track(purchase:)
+│   ├── track(render:)          ├── Tracks render on winner
+│   ├── track(impression:)      ├── Loads & renders image
+│   ├── track(click:)           ├── Tracks impression on image load
+│   ├── track(purchase:)        └── Tracks click on tap
 │   ├── track(pageview:)
 │   ├── flush()
 │   └── executeAuctions()
@@ -244,7 +246,7 @@ A `track` call appends the event to an in-memory queue and returns; nothing happ
 
 `configure()` throws `ConfigurationError` for an invalid `url`, `flushAt < 1` or `flushInterval <= 0`; until it succeeds, `track()` logs and drops the event and `executeAuctions()` throws `AuctionError.notConfigured`.
 
-Events the SDK gives up on are logged and dropped, and reported to `Configuration.onEventsDiscarded` with a `DiscardReason` and a count if you set it (queue eviction is logged at `.warning`, once per episode; the rest at `.error`): rejected by the API with a 4xx (408 and 429 are retried instead), retried 50 times without success, evicted as the oldest once the queue passes 5,000 events, or impossible to serialize (a non-finite `unitPrice`, say — only the offending event is dropped, not its batch).
+Events the SDK gives up on are logged and dropped, and reported to `Configuration.onEventsDiscarded` with a `DiscardReason` and a count if you set it (queue eviction is logged at `.warning`, once per episode; the rest at `.error`): rejected by the API with a 4xx (408 and 429 are retried instead), retried 50 times without success, evicted as the oldest once the queue passes 5,000 events, or impossible to serialize (only the offending event is dropped, not its batch). Items with a `unitPrice` of exactly 0 (gifts, say) are left out of the purchase before it is queued, since the API rejects them. A purchase the API would still reject (empty `items`, every item at 0, an empty `productId`, a `unitPrice` that is negative or not finite, or a `quantity` below 1) is dropped by `track(purchase:)` before it is queued, logged with the field at fault, and reported as `.invalidEvent`.
 
 `executeAuctions()` throws `AuctionError`:
 

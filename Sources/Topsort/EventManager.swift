@@ -368,6 +368,12 @@ class EventManager {
         }
     }
 
+    /// For an event rejected before it was ever queued, so there is nothing to remove. Routed
+    /// through the serial queue anyway so the callback runs where it always does.
+    func discardInvalid() {
+        serialQueue.async { self.discarded(1, reason: .invalidEvent) }
+    }
+
     /// Must be called on serialQueue. A stored batch whose body no longer decodes still held at
     /// least one event, so it is never reported as zero.
     private func discarded(_ count: Int, reason: DiscardReason) {
