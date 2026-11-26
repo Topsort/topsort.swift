@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Replaces Dependabot. The package has no dependencies, so this covers GitHub Actions. Renovate merges its own patch, minor, pin and digest PRs once CI is green; majors wait for a person (INTE-4164).",
+  "extends": ["config:recommended", ":disableRateLimiting"],
+  "timezone": "Europe/Lisbon",
+  "schedule": ["before 9pm on sunday"],
+  "labels": ["dependencies"],
+  "platformAutomerge": false,
+  "packageRules": [
+    {
+      "description": "Automerge patch, minor, pin and digest updates once CI passes",
+      "matchUpdateTypes": ["patch", "minor", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "upload-artifact and download-artifact share a backend and must move together",
+      "matchPackageNames": ["actions/upload-artifact", "actions/download-artifact"],
+      "groupName": "artifact actions"
+    }
+  ]
+}
