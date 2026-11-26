@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Replaces Dependabot. The package has no dependencies, so this covers GitHub Actions. Renovate merges its own patch, minor, pin and digest PRs once CI is green and the release is 3 days old; majors, and actions no PR check runs, wait for a person.",
+  "extends": ["config:recommended"],
+  "timezone": "Europe/Lisbon",
+  "schedule": ["before 9pm on sunday"],
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 10,
+  "platformAutomerge": false,
+  "packageRules": [
+    {
+      "description": "Automerge patch, minor, pin and digest updates once CI passes and the release has aged",
+      "matchUpdateTypes": ["patch", "minor", "pin", "digest"],
+      "matchCurrentVersion": "!/^v?0\\./",
+      "minimumReleaseAge": "3 days",
+      "internalChecksFilter": "strict",
+      "automerge": true
+    },
+    {
+      "description": "These actions only run on main or on release, so no PR check exercises them. Never automerge",
+      "matchPackageNames": ["googleapis/release-please-action", "actions/upload-artifact", "actions/download-artifact", "actions/upload-pages-artifact", "actions/deploy-pages"],
+      "automerge": false
+    },
+    {
+      "description": "upload-artifact and download-artifact share a backend and must move together, majors included",
+      "matchPackageNames": ["actions/upload-artifact", "actions/download-artifact"],
+      "groupName": "artifact actions",
+      "separateMajorMinor": false
+    }
+  ]
+}

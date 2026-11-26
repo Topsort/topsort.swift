@@ -219,7 +219,7 @@ Topsort (core)              TopsortBanners (UI)
 └── HTTPClient (ephemeral URLSession)
 ```
 
-**Event pipeline**: Events are queued in memory, batched by count or interval, and flushed to the Topsort API in POSTs of at most 500 events. Failed requests are retried with exponential backoff (up to 50 retries, 20 min max). Events persist across app restarts in `Application Support`.
+**Event pipeline**: Events are queued in memory, batched by count or interval, and flushed to the Topsort API in POSTs of at most 500 events, and at most 50 of any one event type. Failed requests are retried with exponential backoff (up to 50 retries, 20 min max). Events persist across app restarts in `Application Support`.
 
 **Offline support**: The SDK detects network connectivity. Requests are paused when offline and automatically flushed when the connection is restored.
 
