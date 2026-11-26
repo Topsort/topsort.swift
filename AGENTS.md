@@ -33,11 +33,11 @@ No Makefile, no Xcode project — SPM only.
 
 ### Event Pipeline (EventManager)
 
-Events are queued → periodically flushed (every 30s) → batched into POSTs of at most 500 events → retried on failure.
+Events are queued → periodically flushed (every 30s) → batched into POSTs of at most 500 events and at most 50 per type (renders, impressions, clicks, purchases, pageviews) → retried on failure.
 
 - **Retry**: exponential backoff `min(10 * 2^retries, 1200)` seconds, max 50 retries, max 10 concurrent; a batch that exhausts its retries is dropped
 - **Non-retriable**: all 4xx except 408 and 429. 5xx and transport failures retry
-- **Bounds**: queue capped at 5000 events (oldest shed first); each POST carries at most 500 events
+- **Bounds**: queue capped at 5000 events (oldest shed first); each POST carries at most 500 events and at most 50 of any one type, because the API answers a longer per-type array with a non-retriable 400; the overflow stays queued
 - **Flush triggers**: queue reaches `flushAt` (default 30), the `flushInterval` timer, `flush()`, background/terminate, connectivity restored. `configure` rejects `flushAt < 1` and `flushInterval <= 0`
 - **Queue/pending state**: persisted to plist files in `Application Support/com.topsort.analytics/` (migrated from Documents on first launch; `PathHelper.swift`). Both write atomically; the queue is debounced 5 s (synchronous on background/terminate), the pending set is written on every change — it is the at-least-once ledger
 
@@ -83,6 +83,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 | Max concurrent sends | 10 | `EventManager.swift` |
 | Max queued events | 5000 (oldest dropped) | `EventManager.swift` |
 | Max events per batch | 500 | `EventManager.swift` |
+| Max events per type per request | 50 (`TopsortClient.send` chunks to it too) | `EventManager.swift` |
 | Max backoff | 1200s (20 min) | `EventManager.swift` |
 | Flush interval | 30s | `EventManager.swift` |
 | Flush threshold (`flushAt`) | 30 events | `Configuration.swift` |
@@ -106,7 +107,7 @@ Direct async/await request → response. 1–5 auctions per request (enforced). 
 |----------|---------|--------|---------|
 | Test | push to main, PR | macos-15 | `swift build` + `swift test`; `xcodebuild test` on an iPhone simulator |
 | Format | PR (*.swift changes) | macos-15 | `swiftformat --lint .` (pinned to 0.63.0) |
-| Typos | PR (*.md, *.yml, *.swift) | ubuntu-22.04 | `crate-ci/typos@v1.24.1` |
+| Typos | PR (*.md, *.yml, *.swift) | ubuntu-22.04 | `crate-ci/typos` |
 | Actions | PR (.github/workflows/*) | ubuntu-latest | `actionlint v1.7.7` |
 | Conventional Commits | PR (opened/edited/synchronize) | ubuntu-24.04 | `amannn/action-semantic-pull-request` |
 | Release Please | push to main | ubuntu-24.04 | `googleapis/release-please-action` |
@@ -155,7 +156,7 @@ makes the next release a major.
 
 ## Contributor Recipes
 
-**Add a new event type**: define model struct → add `EventItem` case in `EventManager.swift` → add `Topsort.track(...)` method
+**Add a new event type**: define model struct in `Models/Events.swift` → add the array to `Events` and its initializers → add the `EventItem` case, its `EventItemKind` and `kind` case, and its branches in `toEvents()` / `toItems()` → count it in `PendingEvents.eventCount` → add `Topsort.track(...)` to `TopsortProtocol` and `Topsort` → add a parameter to `TopsortClient.send` (chunked at `MAX_EVENTS_PER_TYPE_PER_BATCH`) → if repeats of a bid must be dropped, handle it in `forgetReports(in:)` → update `PrivacyInfo.xcprivacy` and the README
 
 **Add a new auction field**: add property to model struct in `Auctions.swift` → `Codable` auto-picks it up
 
