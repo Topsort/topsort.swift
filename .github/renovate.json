@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Replaces Dependabot. The package has no dependencies, so this covers GitHub Actions. Renovate merges its own patch, minor, pin and digest PRs once CI is green and the release is 3 days old; majors, and actions no PR check runs, wait for a person (INTE-4164).",
+  "description": "Replaces Dependabot. The package has no dependencies, so this covers GitHub Actions. Renovate merges its own patch, minor, pin and digest PRs once CI is green and the release is 3 days old; majors, and actions no PR check runs, wait for a person.",
   "extends": ["config:recommended"],
   "timezone": "Europe/Lisbon",
   "schedule": ["before 9pm on sunday"],
