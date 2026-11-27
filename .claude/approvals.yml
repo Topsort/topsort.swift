@@ -51,6 +51,6 @@ rules:
       - "Sources/Topsort/Models/Events.swift"
       - "Sources/Topsort/Utils/FilePersistedValue.swift"
       - "Sources/Topsort/Utils/PathHelper.swift"
-      - "Package.swift"
+      - "Package*.swift"
       - "Sources/Topsort/PrivacyInfo.xcprivacy"
     verdict: { claude: comments, seats: [{ count: 1, from: [Topsort/integrations, "!pr/authors"] }] }
