@@ -1,2 +1,2 @@
 
-let __analytics_version = "1.4.2" // x-release-please-version
+let __analytics_version = "1.4.3" // x-release-please-version
