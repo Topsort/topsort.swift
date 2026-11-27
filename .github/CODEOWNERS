@@ -30,3 +30,13 @@ CLAUDE.local.md @Topsort/integrations
 # Build pipeline
 buildspec.yml @Topsort/integrations
 build.sh @Topsort/integrations
+
+# Stored formats, delivery logic, event models, queue location, platforms and privacy manifest
+/Sources/Topsort/PersistedFormat.swift @Topsort/integrations
+/Sources/Topsort/EventManager.swift @Topsort/integrations
+/Tests/topsort.swiftTests/persistedFormat_swiftTests.swift @Topsort/integrations
+/Sources/Topsort/Models/Events.swift @Topsort/integrations
+/Sources/Topsort/Utils/FilePersistedValue.swift @Topsort/integrations
+/Sources/Topsort/Utils/PathHelper.swift @Topsort/integrations
+/Package*.swift @Topsort/integrations
+/Sources/Topsort/PrivacyInfo.xcprivacy @Topsort/integrations
