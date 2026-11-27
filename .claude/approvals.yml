@@ -44,9 +44,10 @@ rules:
     verdict: { claude: comments, seats: 2 }
     override:
       - { if: "claude/code_review = pass", verdict: { claude: approves, seats: 1 } }
-  - purpose: "The stored formats and limits, the event models sent to /v2/events, where the queue is stored, the platforms and the privacy manifest reach every app on its next resolve: someone else from Integrations approves, whatever the review says."
+  - purpose: "The stored formats and limits, the delivery logic that queues, retries and discards events, the event models sent to /v2/events, where the queue is stored, the platforms and the privacy manifest reach every app on its next resolve: someone else from Integrations approves, whatever the review says."
     paths:
       - "Sources/Topsort/PersistedFormat.swift"
+      - "Sources/Topsort/EventManager.swift"
       - "Tests/topsort.swiftTests/persistedFormat_swiftTests.swift"
       - "Sources/Topsort/Models/Events.swift"
       - "Sources/Topsort/Utils/FilePersistedValue.swift"
